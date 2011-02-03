@@ -22,7 +22,7 @@ do
    path=${1%/*}
    file=${1##*/}
    base=${file%%.*}
-   echo "$base.wiki"
+   ./twiki2mediawiki.pl $1 > converted/"$base.wiki"
 
    shift
 done
