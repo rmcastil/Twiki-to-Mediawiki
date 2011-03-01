@@ -6,12 +6,15 @@ Summary
 ---
 I found myself having to migrate our old wiki from twiki to mediawiki. There didn't exist any straightforward tools to do a bulk conversion so I had to use a standalone converter. The only differences in twiki2meiawiki.pl from the original is the format. When I pulled it down from the web everything was on one line.
 
-The very basic convertToMediawiki script takes all given arguments and runs them against the twiki2mediawiki script.
+The very basic convertToMediawiki script takes all given arguments and runs them against the twiki2mediawiki script. The even more basic importFileToWiki script runs mediawiki's importTextFile.php script to import the converted files into the wiki. The first argument refers to the prefix used to keep your imported wiki files separate from your main wiki.
 
 Usage
 ---
 mkdir converted  # Make the converted directory where you plan to run the script
 ./convertToMediawiki.sh <twiki file(s)>
+
+cd <wiki directory>/Maintenance/  # importTextFile.php has to be in this dir if not the script will not work
+./importFileToWiki <prefix> <converted file(s)>
 
 Disclaimer
 ---
