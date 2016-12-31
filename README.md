@@ -12,7 +12,7 @@ Summary
 Run `twiki2mediawiki.pl` to convert a TWiki web to MediaWiki.
 - Process individual TWiki `.txt` files, or trawl through entire data directory
     - Special TWiki pages are ignored (TWikiPreferences, WebStatistics, etc.)
-- Save the MediaWiki files locally, or import them using [importTextFile.php](https://www.mediawiki.org/wiki/Manual:ImportTextFile.php)
+- Save the MediaWiki files locally, or import them using [importTextFiles.php](https://www.mediawiki.org/wiki/Manual:ImportTextFiles.php)
     - Optionally delete pages from database (e.g. to undo previous import) using [deleteBatch.php](https://www.mediawiki.org/wiki/Manual:DeleteBatch.php)
     - Optionally rename to Mediawiki-style links using [moveBatch.php](https://www.mediawiki.org/wiki/Manual:MoveBatch.php)
 - Optionally import attachments using [importImages.php](https://www.mediawiki.org/wiki/Manual:ImportImages.php)
