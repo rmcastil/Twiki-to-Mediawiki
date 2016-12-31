@@ -91,6 +91,7 @@ if ($dir) {
 # *Quoting with a percent ("%") or hash ("#") sign. 
 #
 my ($author, $date, @attachments, $topic, %twikiVar, %warned);  # global variables used by parser
+my $web = "Main";
 my @rules= ( 
 
     # Set variable
@@ -110,7 +111,7 @@ my @rules= (
     q#s/^%META.*//g#, # Remove remaining meta tags 
     
     # %INCLUDE%
-    q#s/%INCLUDE\{"?Main\.(.*?)"?\}%/{{<nop>$1}}/g#, # %INCLUDE{Main.XXX}% --> {{X}}
+    q#s/%INCLUDE\{"?$web\.(.*?)"?\}%/{{<nop>$1}}/g#, # %INCLUDE{$web.XXX}% --> {{X}}
     q#s/%INCLUDE\{.*?\}%//g#, # remove remaining %INCLUDE{...}%'s
     q#s/%STARTINCLUDE%/<onlyinclude>/#,
     q#s/%STOPINCLUDE%/<\/onlyinclude>/#,
@@ -130,10 +131,10 @@ my @rules= (
     # Links 
     # 
     q%s/\[\[(https?\:.*?)\]\[(.*?)\]\]/\[$1 $2\]/g%, # external link [[http:...][label]] 
-    q#s/Main\.([A-Z][a-z]+[A-Z][A-Za-z]*)/$1/g#, # Main.WikiWord -> WikiWord
-    q#s/([A-Z][A-Za-z0-9]*)\.([A-Z][a-z]+[A-Z][A-Za-z]*)/<nop>$1.<nop>$2/g#, # Webname.WikiWord -> <nop>Webname.<nop>WikiWord
-    q%s/\[\[([^\]]*)\]\]/makeLink(makeWikiWord($1),$1)/ge%, # internal link [[WikiWord][WikiWord]] 
-    q%s/\[\[([^\]]*)\]\[(.*?)\]\]/makeLink($1,$2)/ge%, # internal link [[WikiWord][label]]
+    q#s/$web\.([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1,$1)/ge#, # $web.WikiWord -> link
+    q#s/([A-Z][A-Za-z0-9]*)\.([A-Z][a-z]+[A-Z][A-Za-z]*)/<nop>$1.<nop>$2/g#, # OtherWebName.WikiWord -> <nop>OtherWebName.<nop>WikiWord
+    q%s/\[\[([^\]]*)\]\]/makeLink(makeWikiWord($1),$1)/ge%, # [[link]] -> link
+    q%s/\[\[([^\]]*)\]\[(.*?)\]\]/makeLink($1,$2)/ge%, # [[link][text]] -> link
 
     # 
     # Wiki Tags 
@@ -337,7 +338,7 @@ for my $twikiFile (@twikiFiles) {
 		    warn "Attachment not found: $name\n";
 		} else {
 		    my $tempdir = File::Temp->newdir();
-		    system "cp $path $tempdir/$stub:$name";
+		    system "cp $path $tempdir/$stub.$name";
 		    my $extensions = "";
 		    if ($name =~ /\.([^\.]+)$/) { $extensions = "--extensions=" . $1 }
 		    my $comment = $info->{comment};
