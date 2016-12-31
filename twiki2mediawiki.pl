@@ -170,7 +170,7 @@ my @rules= (
     q@s/%PMIDL\{.*?pmid="?(\d+)"?.*?\}%/{{\#pmid:$1}}/g@,
     
     # LatexModePlugin -> Extension:Math
-    q#s/%\$(.*?)\$%/<math>$1<\/math>/#,
+    q#s/%\$(.*?)\$%/<math>$1<\/math>/g#,
 
     # DirectedGraphPlugin -> Extension:GraphViz
     q#s/<(\/?)dot>/<$1graphviz>/g#,
