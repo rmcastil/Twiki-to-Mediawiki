@@ -30,7 +30,7 @@ use Cwd qw(abs_path);
 use File::Temp;
 use DateTime;
 
-my ($dir, $pubdir, $stdout, $imp, $keep, $user, $upload, $dryrun);
+my ($verbose, $dir, $pubdir, $stdout, $imp, $keep, $user, $upload, $dryrun);
 my $mwdir = "/var/www/wiki";
 my $outdir = ".";
 my $php = "php";
@@ -49,7 +49,8 @@ my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
     . " -summary <desc> Summary of edit (default '$summary')\n"
     . " -mwdir <dir>    Location of MediaWiki (default '$mwdir')\n"
     . " -upload         Run MediaWiki $uploadScript script\n"
-    . " -dryrun         Print MediaWiki scripts but don't run them\n"
+    . " -dryrun         Don't run MediaWiki scripts or save files\n"
+    . " -verbose        Print more stuff\n"
     ;
 
 GetOptions ("data=s" => \$dir,
@@ -62,11 +63,12 @@ GetOptions ("data=s" => \$dir,
 	    "summary=s" => \$summary,
 	    "mwdir=s" => \$mwdir,
 	    "upload" => \$upload,
-	    "dryrun" => \$dryrun)
+	    "dryrun" => \$dryrun,
+	    "verbose" => \$verbose)
   or die("Error in command line arguments\n" . $usage);
 die $usage unless @ARGV or $dir;
 
-my $no_file = $stdout && !$imp;
+my $no_file = ($stdout && !$imp) || $dryrun;
 
 my @twikiFiles;
 if ($dir) {
@@ -84,12 +86,15 @@ if ($dir) {
 # 
 # *Quoting with a percent ("%") or hash ("#") sign. 
 #
-my ($author, $date, @attachments);
+my ($author, $date, @attachments, $topic, %warned_unknown);  # global variables used by parser
 my @rules= ( 
 
+    # %TOPIC%
+    q#s/%TOPIC%/$topic/g#,
+    
     # %META%
-    q#s/^%META:TOPICINFO{author="(.*?)" date="(.*?)".*/setTopicInfo($1,$2)/ge#, # 
-    q#s/^%META:FILEATTACHMENT{(.*)}%/addAttachment($1)/ge#, # 
+    q#s/^%META:TOPICINFO{author="(.*?)" date="(.*?)".*/setTopicInfo($1,$2)/ge#,  # %META:TOPICINFO
+    q#s/^%META:FILEATTACHMENT{(.*)}%/addAttachment($1)/ge#,  # %META:FILEATTACHMENT
     q#s/^%META.*//g#, # Remove remaining meta tags 
     
     # %INCLUDE%
@@ -99,12 +104,12 @@ my @rules= (
     q#s/%STOPINCLUDE%/<\/onlyinclude>/#,
 
     # EfetchPlugin -> Extension:PubmedParser
-    q@s/\%PMID\{\s*(\d+)\s*\}\%/{{\#pmid:$1}}/g@,
+    q@s/%PMID\{\s*(\d+)\s*\}%/{{\#pmid:$1}}/g@,
     q@s/%PMIDC\{\s*(\d+)\s*\}%/{{\#pmid:$1}}/g@,
     q@s/%PMIDL\{.*?pmid="(\d+)".*?\}%/{{\#pmid:$1}}/g@,
     
     # LatexModePlugin -> Extension:Math
-    q#s/%$(.*?)$%/<math>$1</math>/#,
+    q#s/%\$(.*?)\$%/<math>$1</math>/#,
 
     # DirectedGraphPlugin -> Extension:GraphViz
     q#s/<dot>/<graphviz>/g#,
@@ -178,10 +183,20 @@ my @rules= (
     q%s/(^|[\n\r])[ ]{24}[0-9]\.? /$1\#\#\#\#\#\#\#\# /%, # level 8 bullet 
     q%s/(^|[\n\r])[ ]{27}[0-9]\.? /$1\#\#\#\#\#\#\#\#\# /%, # level 9 bullet 
     q%s/(^|[\n\r])[ ]{30}[0-9]\.? /$1\#\#\#\#\#\#\#\#\#\# /%, # level 10 bullet 
-    q%s/(^|[\n\r])[ ]{3}\$ ([^\:]*)/$1\; $2 /g% # $ definition: term 
+    q%s/(^|[\n\r])[ ]{3}\$ ([^\:]*)/$1\; $2 /g%, # $ definition: term 
+
+    # Uncaught variables
+    q#s/(%[A-Z]+%)/warn_unknown_var($1)/ge#
+    
     );
 
 for my $twikiFile (@twikiFiles) {
+    unless (-e $twikiFile) {
+	warn "Can't find $twikiFile\n";
+	next;
+    }
+    warn "Processing $twikiFile\n" if $verbose;
+    
     # Get file & dir names
     my $stub = basename($twikiFile);
     $stub =~ s/.txt$//;
@@ -193,6 +208,8 @@ for my $twikiFile (@twikiFiles) {
 	    $twikiPubDir = $pubdir;
 	} else {
 	    # try to guess the TWiki pub directory
+	    warn $twikiFile;
+	    warn abs_path($twikiFile);
 	    my $dataDir = dirname(abs_path($twikiFile));
 	    my $web = basename($dataDir);
 	    $twikiPubDir = abs_path("$dataDir/../../pub/$web");
@@ -202,7 +219,8 @@ for my $twikiFile (@twikiFiles) {
     # Reset globals
     $author = $date = undef;
     @attachments = ();
-
+    $topic = $stub;
+    
     # Open file
     open(TWIKI,"<$twikiFile") or die("unable to open $twikiFile - $!"); 
     if ($no_file) {
@@ -219,7 +237,7 @@ for my $twikiFile (@twikiFiles) {
 	# Handle Table Endings 
 	# 
 	if ($convertingTable && /^[^\|]/) { 
-	    print MEDIAWIKI ("|}\n\n"); 
+	    print_mediawiki ("|}\n\n"); 
 	    $convertingTable = 0; 
 	} 
 	# 
@@ -229,28 +247,28 @@ for my $twikiFile (@twikiFiles) {
 	# 
 	if (/\|/) { 	# Is this the first row of the table? If so, add header 
 	    if (!$convertingTable) { 
-		print MEDIAWIKI "{| border=\"1\"\n"; 
+		print_mediawiki ("{| border=\"1\"\n"); 
 		$convertingTable = 1; 
 	    } 		# start new row 
-	    print MEDIAWIKI "|-\n"; 
+	    print_mediawiki ("|-\n"); 
 	    my $arAnswer = $_; 
 	    $arAnswer =~ s/\|$//; 		#remove end pipe. 
 	    $arAnswer =~ s/(.)\|(.)/$1\|\|$2/g; 		#Change single pipe to double pipe. 
 	    my $text = _translateText($arAnswer); 
-	    print MEDIAWIKI "$text\n"; 
+	    print_mediawiki ("$text\n"); 
 	    # 
 	    # Handle blank lines.. 
 	    # 
 	} 
 	elsif (/^$/) { 
-	    print MEDIAWIKI"$_\n"; 
+	    print_mediawiki ("$_\n");
 	    # 
 	    # Handle anything else... 
 	    # 
 	} 
 	else { 
 	    my $text = _translateText($_); 
-	    print MEDIAWIKI "$text\n"; 
+	    print_mediawiki ("$text\n"); 
 	}
     } # end while. 
     close(TWIKI); 
@@ -363,6 +381,21 @@ sub run_maintenance_script {
     warn "$cmd\n";
     unless ($dryrun) {
 	system "cd $mwdir/maintenance; $cmd";
+    }
+}
+
+sub warn_unknown_var {
+    my ($var) = @_;
+    unless ($warned_unknown{$var}++) {
+	warn "Unknown variable: $var\n";
+    }
+    return $var;
+}
+
+sub print_mediawiki {
+    my (@text) = @_;
+    unless ($dryrun) {
+	print MEDIAWIKI @text;
     }
 }
 
