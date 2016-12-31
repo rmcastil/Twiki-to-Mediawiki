@@ -95,9 +95,8 @@ my @twikiFiles;
 if ($dataDir) {
     opendir DIR, $dataDir or die "Couldn't open $dataDir: $!";
     @twikiFiles = map ("$dataDir/$_", grep (/\.txt$/, readdir(DIR)));
-    push @varFiles, grep (/\bTWikiPreferences\.txt$/, @twikiFiles);
-    push @varFiles, grep (/\bWebPreferences\.txt$/, @twikiFiles);
     closedir DIR;
+    push @varFiles, getTwikiPrefsFiles($dataDir);
 } else {
     @twikiFiles = @ARGV;
 }
@@ -143,15 +142,12 @@ my @rules= (
     q#s/%\$(.*?)\$%/<math>$1</math>/#,
 
     # DirectedGraphPlugin -> Extension:GraphViz
-    q#s/<dot>/<graphviz>/g#,
-    q#s/<\/dot>/<\/graphviz>/g#,
+    q#s/<(\/?)dot>/<$1graphviz>/g#,
     
     # 
     # Links 
     # 
     q%s/\[\[(https?\:.*?)\]\[(.*?)\]\]/\[$1 $2\]/g%, # external link [[http:...][label]] 
-    q#s/$web\.([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1,$1)/ge#, # $web.WikiWord -> link
-    q#s/([A-Z][A-Za-z0-9]*)\.([A-Z][a-z]+[A-Z][A-Za-z]*)/<nop>$1.<nop>$2/g#, # OtherWebName.WikiWord -> <nop>OtherWebName.<nop>WikiWord
     q%s/\[\[([^\]]*)\]\]/makeLink(makeWikiWord($1),$1)/ge%, # [[link]] -> link
     q%s/\[\[([^\]]*)\]\[(.*?)\]\]/makeLink($1,$2)/ge%, # [[link][text]] -> link
 
@@ -159,8 +155,12 @@ my @rules= (
     # Wiki Tags 
     # 
     q#s/<(\/?)verbatim>/<$1nowiki>/g#, # update verbatim tag. 
-    q#s/\!([A-Z]{1}\w+?[A-Z]{1})/<nop>$1/g#, # regularize ! to <nop> in front of Twiki words. 
-    q#s/(?<[\s\[\(])\b([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1,spaceWikiWord($1))/ge#, # WikiWord -> [[WikiWord|WikiWord]]
+    q#s/([A-Z][a-z]+[A-Z][A-Za-z]*:)/<nop>$1/g#, # avoid auto-linking InterWiki links
+    q#s/$web\.([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1)/ge#, # $web.WikiWord -> link
+    q#s/([A-Z][A-Za-z0-9]*)\.([A-Z][a-z]+[A-Z][A-Za-z]*)/<nop>$1.<nop>$2/g#, # OtherWebName.WikiWord -> <nop>OtherWebName.<nop>WikiWord
+    q#s/<nop>([A-Z]{1}\w+?[A-Z]{1})/!$1/g#, # change <nop> to ! in front of Twiki words. 
+    q#s/(?<[\s\[\(!])\b([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1,spaceWikiWord($1))/ge#, # WikiWord -> link
+    q#s/!([A-Z]{1}\w+?[A-Z]{1})/$1/g#, # remove ! in front of Twiki words.
     q#s/<nop>//g#, # remove <nop>
 
     # 
@@ -227,21 +227,7 @@ my %ignoreVar = map (($_ => 1), @ignoredVars);
 # ATTACHURL ATTACHURLPATH PUBURL PUBURLPATH
 # ICON ICONURL ICONURLPATH
 
-for my $twikiVarFile (@varFiles) {
-    unless (-e $twikiVarFile) {
-	warn "Can't find $twikiVarFile\n";
-	next;
-    }
-    warn "Reading variable definitions from $twikiVarFile\n" if $verbose;
-
-    open(TWIKI,"<$twikiVarFile") or die("unable to open $twikiVarFile - $!");
-    while (<TWIKI>) {
-	if (/\* +Set +([A-Za-z]+) += +(.*)/) {
-	    setTwikiVar($1,$2);
-	}
-    }
-    close(TWIKI);
-}
+grep (parseTwikiVars($_), @varFiles);
 my %twikiVarBase = %twikiVar;
 
 my @found;
@@ -257,6 +243,7 @@ for my $twikiFile (@twikiFiles) {
 
 for my $twikiFile (@twikiFiles) {
     # Get file & dir names
+    my $twikiFileDir = dirname(abs_path($twikiFile));
     my $stub = getStub($twikiFile);
     my $mediawikiFile = abs_path($outdir) . '/' . $stub;
 
@@ -268,8 +255,7 @@ for my $twikiFile (@twikiFiles) {
 	    # try to guess the TWiki pub directory
 	    warn $twikiFile;
 	    warn abs_path($twikiFile);
-	    my $dataDir = dirname(abs_path($twikiFile));
-	    my $web = basename($dataDir);
+	    my $web = basename($twikiFileDir);
 	    $twikiPubDir = abs_path("$dataDir/../../pub/$web");
 	}
     }
@@ -279,8 +265,13 @@ for my $twikiFile (@twikiFiles) {
     @attachments = ();
     $topic = $stub;
     %twikiVar = %twikiVarBase;
-    
-    # Open file
+
+    # Parse prefs files unless -data was specified (in which case we've already parsed them)
+    unless ($dataDir) {
+	grep (parseTwikiVars($_), getTwikiPrefsFiles($twikiFileDir));
+    }
+
+    # Open input & output files
     open(TWIKI,"<$twikiFile") or die("unable to open $twikiFile - $!"); 
     if ($no_file) {
 	*MEDIAWIKI = *STDOUT;
@@ -409,17 +400,19 @@ sub _translateText {
 
 sub makeLink {
     my ($link, $text) = @_;
-    return $link =~ /^http/ ? makeExternalLink($link,$text) : makeInternalLink($link,$text);
+    return $link =~ /^[A-Za-z0-9\.]+$/ ? makeInternalLink($link,$text) : makeExternalLink($link,$text);
 }
 
 sub makeInternalLink {
     my ($link, $text) = @_;
     if ($renamePages) { $link = spaceWikiWord($link) }
+    $text = $text || $link;
     return ($link eq $text) ? "[[<nop>$link]]" : "[[<nop>$link|<nop>$text]]";
 }
 
 sub makeExternalLink {
     my ($link, $text) = @_;
+    $text = $text || $link;
     return ($link eq $text) ? "<nop>$link" : "[<nop>$link <nop>$text]";
 }
 
@@ -482,9 +475,34 @@ sub getTwikiVar {
     return "";
 }
 
+sub parseTwikiVars {
+    my ($twikiVarFile) = @_;
+    unless (-e $twikiVarFile) {
+	warn "Can't find $twikiVarFile\n";
+	next;
+    }
+    warn "Reading variable definitions from $twikiVarFile\n" if $verbose;
+
+    open(TWIKI,"<$twikiVarFile") or die("unable to open $twikiVarFile - $!");
+    while (<TWIKI>) {
+	if (/\* +Set +([A-Za-z]+) += +(.*)/) {
+	    setTwikiVar($1,$2);
+	}
+    }
+    close(TWIKI);
+}
+
+sub getTwikiPrefsFiles {
+    my ($dir) = @_;
+    return map ((-e) ? abs_path($_) : (),
+		"$dir/../TWiki/TWikiPreferences.txt",
+		"$dir/TWikiPreferences.txt",
+		"$dir/WebPreferences.txt");
+}
+    
 sub printMediawiki {
     my (@text) = @_;
-    unless ($dryRun) {
+    unless ($dryRun && !$useStdout) {
 	print MEDIAWIKI @text;
     }
 }
