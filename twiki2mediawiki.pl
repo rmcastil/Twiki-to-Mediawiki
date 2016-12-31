@@ -30,6 +30,7 @@ use Cwd qw(abs_path);
 use File::Temp;
 use DateTime;
 
+# Options that are disabled/empty by default
 my ($verbose,
     $dataDir,
     $pubDir,
@@ -43,6 +44,7 @@ my ($verbose,
     $uploadAttachments,
     $dryRun);
 
+# Mediawiki globals & options
 my $mwdir = "/var/www/wiki";
 my $outdir = ".";
 my $php = "php";
@@ -53,6 +55,10 @@ my $uploadScript = "importImages.php";
 my $moveScript = "moveBatch.php";
 my $deleteScript = "deleteBatch.php";
 
+# TWiki globals
+my $web = "Main";
+
+# Parse command line
 my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
     . " -data <dir>     Convert all .txt files in directory\n"
     . " -pub <dir>      Location of TWiki pub directory\n"
@@ -91,6 +97,7 @@ die $usage unless @ARGV or $dataDir;
 
 my $no_file = ($useStdout && !$importPages) || $dryRun;
 
+# Build list of files
 my @twikiFiles;
 if ($dataDir) {
     opendir DIR, $dataDir or die "Couldn't open $dataDir: $!";
@@ -108,8 +115,7 @@ if ($dataDir) {
 # 
 # *Quoting with a percent ("%") or hash ("#") sign. 
 #
-my ($author, $date, @attachments, $topic, %twikiVar, %warned);  # global variables used by parser
-my $web = "Main";
+my ($topic, $author, $date, @attachments, %twikiVar, %warned, $currentText);  # global variables used by parser
 my @rules= ( 
 
     # Set variable
@@ -124,6 +130,12 @@ my @rules= (
     q#s/%MAINWEB%/Main/g#,
     q#s/%TWIKIWEB%/TWiki/g#,
 
+    # ATTACHURL, PUBURL
+    q#s/%ATTACHURL%\//Media:$topic./g#,
+    q#s/%ATTACHURLPATH%\//Media:$topic./g#,
+    q#s/%PUBURL%\/[^\/]+\/([^\/]+)\//Media:$1./g#,
+    q#s/%PUBURLPATH%\/[^\/]+\/([^\/]+)\//Media:$1./g#,
+    
     # %DATE% and %DISPLAYTIME%
     q#s/%DATE%/{{CURRENTYEAR}}-{{CURRENTMONTH}}-{{CURRENTDAY}}/g#,
     q#s/%DISPLAYTIME%/{{CURRENTYEAR}}-{{CURRENTMONTH}}-{{CURRENTDAY}} {{CURRENTTIME}/g#,
@@ -225,6 +237,7 @@ my @rules= (
     
     );
 
+# Variables and pages to ignore
 my @ignoredVars = qw(ADDTOHEAD ALLOWLOGINNAME ALLVARIABLES AUTHREALM BASETOPIC BASEWEB CALENDAR CHARSET COMMENT CONTENTMODE CRYPTTOKEN DEFAULTURLHOST DISKID EDITFORMFIELD ENCODE ENDSECTION ENTITY ENV FORMFIELD GMTIME GROUPS HEADLINES HIDE HIDEINPRINT HOMETOPIC HTTP HTTPS HTTP_HOST IF INCLUDINGTOPIC INCLUDINGWEB INTURLENCODE LABLOG LANG LANGUAGE LANGUAGES LOCALSITEPREFS MAKETEXT MDREPO METASEARCH NOFOLLOW NOP NOTIFYTOPIC PARENTTOPIC PLUGINVERSION QUERYPARAMS QUERYSTRING REDIRECT RELATIVETOPICPATH REMOTE_ADDR REMOTE_PORT REMOTE_USER RENDERHEAD REVARG REVINFO REVTITLE SCRIPTNAME SCRIPTSUFFIX SCRIPTURL SCRIPTURLPATH SEARCH SEP SERVERTIME SESSIONLOGON SITESTATISTICSTOPIC SPACEOUT STARTSECTION STATISTICSTOPIC SYSTEMWEB TABLE TGPOPUP TOC TOPICLIST TOPICMAP TOPICTITLE TRASHWEB TWIKIADMINLOGIN URLENCODE URLPARAM USERINFO USERNAME USERPREFSTOPIC USERSWEB VAR VARIABLES WEBLIST WEBPREFSTOPIC WIKINAME WIKIPREFSTOPIC WIKIUSERNAME WIKIUSERSTOPIC WIKIVERSION WIKIWEBMASTER WIKIWEBMASTERNAME);
 my %ignoreVar = map (($_ => 1), @ignoredVars);
 
@@ -232,7 +245,6 @@ my @ignoredPages = qw(AllAuthUsersGroup AllUsersGroup ChangeProfilePicture Nobod
 my %ignorePage = map (($_ => 1), @ignoredPages);
 
 # TODO: implement...
-# ATTACHURL ATTACHURLPATH PUBURL PUBURLPATH
 # ICON ICONURL ICONURLPATH
 
 grep (parseTwikiVars($_), @varFiles);
@@ -257,16 +269,14 @@ for my $twikiFile (@twikiFiles) {
     my $stub = getStub($twikiFile);
     my $mediawikiFile = abs_path($outdir) . '/' . $stub;
 
+    # Try to find attachment directory, if relevant
     my $twikiPubDir;
     if ($uploadAttachments) {
 	if (defined $pubDir) {
 	    $twikiPubDir = $pubDir;
 	} else {
 	    # try to guess the TWiki pub directory
-	    warn $twikiFile;
-	    warn abs_path($twikiFile);
-	    my $web = basename($twikiFileDir);
-	    $twikiPubDir = abs_path("$dataDir/../../pub/$web");
+	    $twikiPubDir = abs_path("$twikiFileDir/../../pub/$web");
 	}
     }
 
@@ -402,9 +412,10 @@ sub _translateText {
     foreach my $rule (@rules) { 
 	$rule =~ /^(.*)$/; 
 	$rule = $1; 
+	$currentText = $text;  # for errors/warnings
 	eval( "\$text =~ $rule;" ); 
     } 
-	return $text; 
+    return $text; 
 } 
 # ================================================================
 
@@ -484,6 +495,7 @@ sub getTwikiVar {
 	my $orig = "\%$var$args\%";
 	unless ($warned{$orig}++) {
 	    warn "Unknown variable: $orig\t($topic)\n";
+	    warn " Source:\t$_\nCurrent:\t$currentText\n" if $verbose;
 	}
 	$ret = $orig;
     }
