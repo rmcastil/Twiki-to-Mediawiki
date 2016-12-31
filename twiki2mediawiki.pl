@@ -121,6 +121,7 @@ my @rules= (
 
     # Set variable
     q#s/^\s+\* +Set +([A-Za-z]+) += +(.*)/setTwikiVar($1,$2)/ge#,
+    q#s/^%META:PREFERENCE{name="(.+?)".*type="Set".*value="(.*?)".*$/setTwikiVar($1,$2)/ge#,
 
     # %TOPIC% and %SPACEDTOPIC%
     q#s/%TOPIC%/$topic/g#,
@@ -371,7 +372,7 @@ for my $twikiFile (@twikiFiles) {
 
     # Do Mediawiki import
     if ($importPages) {
-	my $mwUser = ($user or $author);
+	my $mwUser = ($user or $author or "");
 	if ($useStdout) { system "cat $mediawikiFile" }
 	run_maintenance_script ("$importScript --bot --overwrite --user='$mwUser' --summary='$summary' $use_timestamp $mediawikiFile");
 	unlink($mediawikiFile) unless $keepPageFiles;
@@ -566,6 +567,8 @@ sub parseTwikiVars {
     open(TWIKI,"<$twikiVarFile") or die("unable to open $twikiVarFile - $!");
     while (<TWIKI>) {
 	if (/\* +Set +([A-Za-z]+) += +(.*)/) {
+	    setTwikiVar($1,$2);
+	} elsif (/^%META:PREFERENCE{name="(.+?)".*type="Set".*value="(.*?)"/) {
 	    setTwikiVar($1,$2);
 	}
     }

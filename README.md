@@ -44,4 +44,4 @@ This source is NOT thoroughly tested, and will not be supported. Use at your own
 This code should not be seen as a statement of wiki-engine advocacy.
 TWiki has given me great service over the years, and the community is helpful.
 However, sometimes you have to move.
-My hope is that easing migration to Mediawiki will ultimately make TWiki itself more appealing, as well as rescuing content from some TWikis that might otherwise be abandoned.
+My hope is that the possibility of an easier migration to Mediawiki will ultimately make TWiki itself more appealing, as well as rescuing content from some TWikis that might otherwise be abandoned.
