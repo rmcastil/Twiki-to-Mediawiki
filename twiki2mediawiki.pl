@@ -30,13 +30,28 @@ use Cwd qw(abs_path);
 use File::Temp;
 use DateTime;
 
-my ($verbose, $dir, $pubdir, $stdout, @varFiles, $imp, $keep, $user, $upload, $dryrun);
+my ($verbose,
+    $dataDir,
+    $pubDir,
+    $useStdout,
+    @varFiles,
+    $deletePages,
+    $importPages,
+    $renamePages,
+    $keepPageFiles,
+    $user,
+    $uploadAttachments,
+    $dryRun);
+
 my $mwdir = "/var/www/wiki";
 my $outdir = ".";
 my $php = "php";
-my $impScript = "importTextFiles.php";
-my $uploadScript = "importImages.php";
 my $summary = "Imported from TWiki";
+
+my $importScript = "importTextFiles.php";
+my $uploadScript = "importImages.php";
+my $moveScript = "moveBatch.php";
+my $deleteScript = "deleteBatch.php";
 
 my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
     . " -data <dir>     Convert all .txt files in directory\n"
@@ -44,7 +59,9 @@ my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
     . " -out <dir>      Output directory (default '$outdir')\n"
     . " -stdout         Print to stdout instead of file\n"
     . " -vars <file>    Parse TWiki variable definitions from file\n"
-    . " -import         Run MediaWiki $impScript script\n"
+    . " -delete         Delete using $deleteScript\n"
+    . " -import         Run MediaWiki $importScript script\n"
+    . " -rename         Rename (CamelCase -> Camel_Case) using $moveScript\n"
     . " -keep           Keep MediaWiki file after import\n"
     . " -user <name>    Username for import (overrides TWiki author)\n"
     . " -summary <desc> Summary of edit (default '$summary')\n"
@@ -54,28 +71,30 @@ my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
     . " -verbose        Print more stuff\n"
     ;
 
-GetOptions ("data=s" => \$dir,
-	    "pub=s" => \$pubdir,
+GetOptions ("data=s" => \$dataDir,
+	    "pub=s" => \$pubDir,
 	    "out=s" => \$outdir,
-	    "stdout" => \$stdout,
+	    "stdout" => \$useStdout,
 	    "vars=s" => \@varFiles,
-	    "import" => \$imp,
-	    "keep" => \$keep,
+	    "delete" => \$deletePages,
+	    "rename" => \$renamePages,
+	    "import" => \$importPages,
+	    "keep" => \$keepPageFiles,
 	    "user=s" => \$user,
 	    "summary=s" => \$summary,
 	    "mwdir=s" => \$mwdir,
-	    "upload" => \$upload,
-	    "dryrun" => \$dryrun,
+	    "upload" => \$uploadAttachments,
+	    "dryrun" => \$dryRun,
 	    "verbose" => \$verbose)
   or die("Error in command line arguments\n" . $usage);
-die $usage unless @ARGV or $dir;
+die $usage unless @ARGV or $dataDir;
 
-my $no_file = ($stdout && !$imp) || $dryrun;
+my $no_file = ($useStdout && !$importPages) || $dryRun;
 
 my @twikiFiles;
-if ($dir) {
-    opendir DIR, $dir or die "Couldn't open $dir: $!";
-    @twikiFiles = map ("$dir/$_", grep (/\.txt$/, readdir(DIR)));
+if ($dataDir) {
+    opendir DIR, $dataDir or die "Couldn't open $dataDir: $!";
+    @twikiFiles = map ("$dataDir/$_", grep (/\.txt$/, readdir(DIR)));
     push @varFiles, grep (/\bTWikiPreferences\.txt$/, @twikiFiles);
     push @varFiles, grep (/\bWebPreferences\.txt$/, @twikiFiles);
     closedir DIR;
@@ -225,22 +244,34 @@ for my $twikiVarFile (@varFiles) {
 }
 my %twikiVarBase = %twikiVar;
 
+my @found;
 for my $twikiFile (@twikiFiles) {
-    unless (-e $twikiFile) {
+    if (-e $twikiFile) {
+	push @found, $twikiFile;
+    } else {
 	warn "Can't find $twikiFile\n";
 	next;
     }
-    warn "Processing $twikiFile\n" if $verbose;
-    
+}
+@twikiFiles = @found;
+
+if ($deletePages) {
+    my $tmp = File::Temp->new();
+    print $tmp map (getStub($_)."\n", @twikiFiles);
+    close $tmp;
+    my $tmpFilename = $tmp->filename;
+    run_maintenance_script ("$deleteScript $tmpFilename");
+}
+
+for my $twikiFile (@twikiFiles) {
     # Get file & dir names
-    my $stub = basename($twikiFile);
-    $stub =~ s/.txt$//;
+    my $stub = getStub($twikiFile);
     my $mediawikiFile = abs_path($outdir) . '/' . $stub;
 
     my $twikiPubDir;
-    if ($upload) {
-	if (defined $pubdir) {
-	    $twikiPubDir = $pubdir;
+    if ($uploadAttachments) {
+	if (defined $pubDir) {
+	    $twikiPubDir = $pubDir;
 	} else {
 	    # try to guess the TWiki pub directory
 	    warn $twikiFile;
@@ -273,7 +304,7 @@ for my $twikiFile (@twikiFiles) {
 	# Handle Table Endings 
 	# 
 	if ($convertingTable && /^[^\|]/) { 
-	    print_mediawiki ("|}\n\n"); 
+	    printMediawiki ("|}\n\n"); 
 	    $convertingTable = 0; 
 	} 
 	# 
@@ -283,28 +314,28 @@ for my $twikiFile (@twikiFiles) {
 	# 
 	if (/\|/) { 	# Is this the first row of the table? If so, add header 
 	    if (!$convertingTable) { 
-		print_mediawiki ("{| border=\"1\"\n"); 
+		printMediawiki ("{| border=\"1\"\n"); 
 		$convertingTable = 1; 
 	    } 		# start new row 
-	    print_mediawiki ("|-\n"); 
+	    printMediawiki ("|-\n"); 
 	    my $arAnswer = $_; 
 	    $arAnswer =~ s/\|$//; 		#remove end pipe. 
 	    $arAnswer =~ s/(.)\|(.)/$1\|\|$2/g; 		#Change single pipe to double pipe. 
 	    my $text = _translateText($arAnswer); 
-	    print_mediawiki ("$text\n"); 
+	    printMediawiki ("$text\n"); 
 	    # 
 	    # Handle blank lines.. 
 	    # 
 	} 
 	elsif (/^$/) { 
-	    print_mediawiki ("$_\n");
+	    printMediawiki ("$_\n");
 	    # 
 	    # Handle anything else... 
 	    # 
 	} 
 	else { 
 	    my $text = _translateText($_); 
-	    print_mediawiki ("$text\n"); 
+	    printMediawiki ("$text\n"); 
 	}
     } # end while. 
     close(TWIKI); 
@@ -320,14 +351,14 @@ for my $twikiFile (@twikiFiles) {
     }
 
     # Do Mediawiki import/upload
-    if ($imp) {
+    if ($importPages) {
 	my $mwUser = ($user or $author);
-	if ($stdout) { system "cat $mediawikiFile" }
-	run_maintenance_script ("$impScript --bot --overwrite --user='$mwUser' --summary='$summary' $use_timestamp");
-	unlink($mediawikiFile) unless $keep;
+	if ($useStdout) { system "cat $mediawikiFile" }
+	run_maintenance_script ("$importScript --bot --overwrite --user='$mwUser' --summary='$summary' $use_timestamp");
+	unlink($mediawikiFile) unless $keepPageFiles;
     }
 
-    if ($upload && @attachments) {
+    if ($uploadAttachments && @attachments) {
 	unless (-d $twikiPubDir) {
 	    warn "TWiki pub directory not found: $twikiPubDir\n";
 	} else {
@@ -415,7 +446,7 @@ sub run_maintenance_script {
     my ($script) = @_;
     my $cmd = "$php $script";
     warn "$cmd\n";
-    unless ($dryrun) {
+    unless ($dryRun) {
 	system "cd $mwdir/maintenance; $cmd";
     }
 }
@@ -439,11 +470,18 @@ sub getTwikiVar {
     return "";
 }
 
-sub print_mediawiki {
+sub printMediawiki {
     my (@text) = @_;
-    unless ($dryrun) {
+    unless ($dryRun) {
 	print MEDIAWIKI @text;
     }
+}
+
+sub getStub {
+    my ($twikiFile) = @_;
+    my $stub = basename($twikiFile);
+    $stub =~ s/.txt$//;
+    return $stub;
 }
 
 1;
