@@ -96,8 +96,13 @@ my @rules= (
     # Set variable
     q#s/^\s+\* +Set +([A-Za-z]+) += +(.*)/setTwikiVar($1,$2)/ge#,
 
-    # %TOPIC%
+    # %TOPIC% and %SPACEDTOPIC%
     q#s/%TOPIC%/$topic/g#,
+    q#s/%SPACEDTOPIC%/spaceWikiWord($topic)/eg#,
+
+    # %DATE% and %DISPLAYTIME%
+    q#s/%DATE%/{{CURRENTYEAR}}-{{CURRENTMONTH}}-{{CURRENTDAY}}/g#,
+    q#s/%DISPLAYTIME%/{{CURRENTYEAR}}-{{CURRENTMONTH}}-{{CURRENTDAY}} {{CURRENTTIME}/g#,
     
     # %META%
     q#s/^%META:TOPICINFO{author="(.*?)" date="(.*?)".*/setTopicInfo($1,$2)/ge#,  # %META:TOPICINFO
@@ -111,9 +116,8 @@ my @rules= (
     q#s/%STOPINCLUDE%/<\/onlyinclude>/#,
 
     # EfetchPlugin -> Extension:PubmedParser
-    q@s/%PMID\{\s*(\d+)\s*\}%/{{\#pmid:$1}}/g@,
-    q@s/%PMIDC\{\s*(\d+)\s*\}%/{{\#pmid:$1}}/g@,
-    q@s/%PMIDL\{.*?pmid="(\d+)".*?\}%/{{\#pmid:$1}}/g@,
+    q@s/%PMID[LC]?\{\s*(\d+)\s*\}%/{{\#pmid:$1}}/g@,
+    q@s/%PMIDL\{.*?pmid="?(\d+)"?.*?\}%/{{\#pmid:$1}}/g@,
     
     # LatexModePlugin -> Extension:Math
     q#s/%\$(.*?)\$%/<math>$1</math>/#,
@@ -134,8 +138,6 @@ my @rules= (
     # 
     # Wiki Tags 
     # 
-    q#s/^%TOC%//g#, # Remove Table of contents 
-    q#s/^%BLOC%//g#, # Remove %BLOC%
     q#s/<(\/?)verbatim>/<$1nowiki>/g#, # update verbatim tag. 
     q#s/\!([A-Z]{1}\w+?[A-Z]{1})/<nop>$1/g#, # regularize ! to <nop> in front of Twiki words. 
     q#s/(?<[\s\[\(])\b([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1,spaceWikiWord($1))/ge#, # WikiWord -> [[WikiWord|WikiWord]]
@@ -193,9 +195,17 @@ my @rules= (
     q%s/(^|[\n\r])[ ]{3}\$ ([^\:]*)/$1\; $2 /g%, # $ definition: term 
 
     # Lookup variable
-    q#s/%([A-Z]+)%/getTwikiVar($1)/ge#
+    q#s/%([A-Z]+)%/getTwikiVar($1,'')/ge#,
+    q#s/%([A-Z]+)(\{.*?\})%/getTwikiVar($1,$2)/ge#
     
     );
+
+my @ignoredVars = qw(ADDTOHEAD ALLVARIABLES BASETOPIC BASEWEB CONTENTMODE CRYPTTOKEN DISKID EDITFORMFIELD ENCODE ENTITY ENV FORMFIELD GMTIME GROUPS HIDE HIDEINPRINT HTTP_HOST HTTP HTTPS IF INCLUDE INCLUDINGTOPIC INCLUDINGWEB INTURLENCODE LANGUAGES MAKETEXT MDREPO METASEARCH NOP PARENTTOPIC PLUGINVERSION QUERYPARAMS QUERYSTRING RELATIVETOPICPATH REMOTE_ADDR REMOTE_PORT REMOTE_USER RENDERHEAD REVINFO REVTITLE REVARG SCRIPTNAME SCRIPTURL SCRIPTURLPATH SEARCH SEP SERVERTIME SPACEOUT TOPICLIST TOPICTITLE TRASHWEB URLENCODE URLPARAM LANGUAGE USERINFO USERNAME VAR WEB WEBLIST WIKINAME WIKIUSERNAME WIKIWEBMASTER WIKIWEBMASTERNAME ENDSECTION WIKIVERSION STARTSECTION REDIRECT TOC ALLOWLOGINNAME AUTHREALM DEFAULTURLHOST HOMETOPIC LOCALSITEPREFS NOFOLLOW NOTIFYTOPIC SCRIPTSUFFIX SITESTATISTICSTOPIC STATISTICSTOPIC SYSTEMWEB TRASHWEB TWIKIADMINLOGIN USERSWEB WEBPREFSTOPIC WIKIPREFSTOPIC WIKIUSERSTOPIC USERPREFSTOPIC CHARSET LANG TOPICMAP COMMENT TGPOPUP CALENDAR TABLE LABLOG HEADLINES SESSIONLOGON VARIABLES);
+my %ignoreVar = map (($_ => 1), @ignoredVars);
+
+# TODO: implement...
+# ATTACHURL ATTACHURLPATH PUBURL PUBURLPATH
+# ICON ICONURL ICONURLPATH
 
 for my $twikiVarFile (@varFiles) {
     unless (-e $twikiVarFile) {
@@ -417,12 +427,12 @@ sub setTwikiVar {
 }
 
 sub getTwikiVar {
-    my ($var) = @_;
+    my ($var, $args) = @_;
     if (exists $twikiVar{$var}) {
 	return _translateText($twikiVar{$var});
-    } else {
+    } elsif (!$ignoreVar{$var}) {
 	unless ($warned{$var}++) {
-	    warn "Unknown variable: $var\n";
+	    warn "Unknown variable: \%$var$args\%\t($topic)\n";
 	}
     }
     return "";
