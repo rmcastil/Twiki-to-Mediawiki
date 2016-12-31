@@ -152,8 +152,8 @@ my @rules= (
     q#s/^%META.*//g#, # Remove remaining meta tags 
     
     # %INCLUDE%
-    q#s/%INCLUDE\{"?$web\.(.*?)"?\}%/{{<nop>$1}}/g#, # %INCLUDE{$web.XXX}% --> {{XXX}}
-    q#s/%INCLUDE\{"?(.*?)"?\}%/{{<nop>$1}}/g#, # %INCLUDE{XXX}% --> {{XXX}}
+    q#s/%INCLUDE\{"?$web\.(.*?)"?\}%/{{:<nop>$1}}/g#, # %INCLUDE{$web.XXX}% --> {{XXX}}
+    q#s/%INCLUDE\{"?(.*?)"?\}%/{{:<nop>$1}}/g#, # %INCLUDE{XXX}% --> {{XXX}}
     q#s/%INCLUDE\{.*?\}%//g#, # remove remaining %INCLUDE{...}%'s
     q#s/%STARTINCLUDE%/<onlyinclude>/#,
     q#s/%STOPINCLUDE%/<\/onlyinclude>/#,
