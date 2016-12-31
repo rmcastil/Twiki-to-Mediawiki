@@ -30,12 +30,18 @@ Requires:
 License
 -------
 
-The original twiki2mediawiki.pl source, and @rmcastil's derivative, are under the GPL license.
+This program (like the original twiki2mediawiki.pl source, and @rmcastil's derivative) are under the GPL license.
+
 The original sources can be found here:
 - https://github.com/rmcastil/Twiki-to-Mediawiki
 - http://it.toolbox.com/wiki/index.php/Twiki2mediawiki
 
-Disclaimer
-----------
+Disclaimers
+-----------
 
 This source is NOT thoroughly tested, and will not be supported. Use at your own risk. I needed a simple solution and this is what I came up with.
+
+This code should not be seen as a statement of wiki-engine advocacy.
+TWiki has given me great service over the years, and the community is helpful.
+However, sometimes you have to move.
+My hope is that easing migration to Mediawiki will ultimately make TWiki itself more appealing, as well as rescuing content from some TWikis that might otherwise be abandoned.
