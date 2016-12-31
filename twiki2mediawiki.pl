@@ -61,12 +61,12 @@ my $web = "Main";
 # Parse command line
 my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
     . " -data <dir>     Convert all .txt files in directory\n"
-    . " -pub <dir>      Location of TWiki pub directory\n"
     . " -out <dir>      Output directory (default '$outdir')\n"
     . " -stdout         Print to stdout instead of file\n"
     . " -vars <file>    Parse TWiki variable definitions from file\n"
     . " -delete         Delete using $deleteScript\n"
     . " -import         Run MediaWiki $importScript script\n"
+    . " -pub <dir>      Location of TWiki pub dir (default datadir/../../pub)\n"
     . " -rename         Rename (CamelCase -> Camel_Case) using $moveScript\n"
     . " -keep           Keep MediaWiki file after import\n"
     . " -user <name>    Username for import (overrides TWiki author)\n"
@@ -115,7 +115,7 @@ if ($dataDir) {
 # 
 # *Quoting with a percent ("%") or hash ("#") sign. 
 #
-my ($topic, $author, $date, @attachments, %twikiVar, %warned, $currentText);  # global variables used by parser
+my ($topic, $author, $date, @attachments, @linkedAttachments, %twikiVar, %warned, $currentText);  # global variables used by parser
 my @rules= ( 
 
     # Set variable
@@ -123,7 +123,7 @@ my @rules= (
 
     # %TOPIC% and %SPACEDTOPIC%
     q#s/%TOPIC%/$topic/g#,
-    q#s/%SPACEDTOPIC%/spaceWikiWord($topic)/eg#,
+    q#s/%SPACEDTOPIC%/spaceWikiWord($topic)/ge#,
 
     # %WEB%, %MAINWEB%, %TWIKIWEB%
     q#s/%WEB%/$web/g#,
@@ -131,10 +131,10 @@ my @rules= (
     q#s/%TWIKIWEB%/TWiki/g#,
 
     # ATTACHURL, PUBURL
-    q#s/%ATTACHURL%\//Media:$topic./g#,
-    q#s/%ATTACHURLPATH%\//Media:$topic./g#,
-    q#s/%PUBURL%\/[^\/]+\/([^\/]+)\//Media:$1./g#,
-    q#s/%PUBURLPATH%\/[^\/]+\/([^\/]+)\//Media:$1./g#,
+    q#s/%ATTACHURL%\//attachmentLinkPrefix($web,$topic)/ge#,
+    q#s/%ATTACHURLPATH%\//attachmentLinkPrefix($web,$topic)/ge#,
+    q#s/%PUBURL%\/([^\/]+)\/([^\/]+)\/([^\"\s\]]+)/attachmentLink($1,$2,$3)/ge#,
+    q#s/%PUBURLPATH%\/([^\/]+)\/([^\/]+)\/([^\"\s\]]+)/attachmentLink($1,$2,$3)/ge#,
     
     # %DATE% and %DISPLAYTIME%
     q#s/%DATE%/{{CURRENTYEAR}}-{{CURRENTMONTH}}-{{CURRENTDAY}}/g#,
@@ -142,7 +142,7 @@ my @rules= (
     
     # %META%
     q#s/^%META:TOPICINFO{author="(.*?)" date="(.*?)".*/setTopicInfo($1,$2)/ge#,  # %META:TOPICINFO
-    q#s/^%META:FILEATTACHMENT{(.*)}%/addAttachment($1)/ge#,  # %META:FILEATTACHMENT
+    q#s/^%META:FILEATTACHMENT{(.*)}%/addAttachment($1,$web,$topic)/ge#,  # %META:FILEATTACHMENT
     q#s/^%META.*//g#, # Remove remaining meta tags 
     
     # %INCLUDE%
@@ -263,26 +263,28 @@ for my $twikiFile (@twikiFiles) {
 }
 @twikiFiles = @found;
 
+# Delete
+if ($deletePages) {
+    my $tmp = File::Temp->new();
+    print $tmp map (getStub($_)."\n", @twikiFiles);
+    if ($renamePages) {
+	print $tmp map (spaceWikiWord(getStub($_))."\n", @twikiFiles);
+    }
+    close $tmp;
+    my $tmpFilename = $tmp->filename;
+	run_maintenance_script ("$deleteScript $tmpFilename");
+}
+
+# Convert
 for my $twikiFile (@twikiFiles) {
+    warn "Processing $twikiFile\n" if $verbose;
     # Get file & dir names
     my $twikiFileDir = dirname(abs_path($twikiFile));
     my $stub = getStub($twikiFile);
     my $mediawikiFile = abs_path($outdir) . '/' . $stub;
 
-    # Try to find attachment directory, if relevant
-    my $twikiPubDir;
-    if ($uploadAttachments) {
-	if (defined $pubDir) {
-	    $twikiPubDir = $pubDir;
-	} else {
-	    # try to guess the TWiki pub directory
-	    $twikiPubDir = abs_path("$twikiFileDir/../../pub/$web");
-	}
-    }
-
-    # Reset globals
+    # Reset page-specific globals
     $author = $date = undef;
-    @attachments = ();
     $topic = $stub;
     %twikiVar = %twikiVarBase;
 
@@ -353,54 +355,73 @@ for my $twikiFile (@twikiFiles) {
 	$use_timestamp = "--use-timestamp";
     }
 
-    # Do Mediawiki delete/import/rename/upload
-    if ($deletePages) {
-	my $tmp = File::Temp->new();
-	print $tmp map (getStub($_)."\n", @twikiFiles);
-	if ($renamePages) {
-	    print $tmp map (spaceWikiWord(getStub($_))."\n", @twikiFiles);
-	}
-	close $tmp;
-	my $tmpFilename = $tmp->filename;
-	run_maintenance_script ("$deleteScript $tmpFilename");
-    }
-
+    # Do Mediawiki import
     if ($importPages) {
 	my $mwUser = ($user or $author);
 	if ($useStdout) { system "cat $mediawikiFile" }
 	run_maintenance_script ("$importScript --bot --overwrite --user='$mwUser' --summary='$summary' $use_timestamp");
 	unlink($mediawikiFile) unless $keepPageFiles;
     }
-    
-    if ($renamePages) {
-	my $tmp = File::Temp->new();
-	print $tmp map ($_."|".spaceWikiWord($_)."\n", map (getStub($_), @twikiFiles));
-	close $tmp;
-	my $tmpFilename = $tmp->filename;
-	run_maintenance_script ("$moveScript --r='Rename from TWiki to MediaWiki style' $tmpFilename");
+}
+
+# Rename
+if ($renamePages) {
+    my $tmp = File::Temp->new();
+    print $tmp map ($_."|".spaceWikiWord($_)."\n", map (getStub($_), @twikiFiles));
+    close $tmp;
+    my $tmpFilename = $tmp->filename;
+    run_maintenance_script ("$moveScript --r='Rename from TWiki to MediaWiki style' $tmpFilename");
+}
+
+# Upload
+if ($uploadAttachments && (@attachments || @linkedAttachments)) {
+
+    # Try to find attachment directory, if relevant
+    my $twikiPubDir;
+    if (defined $pubDir) {
+	$twikiPubDir = $pubDir;
+    } else {
+	# try to guess the TWiki pub directory
+	$twikiPubDir = abs_path(dirname(abs_path($twikiFiles[0]))."/../../pub");
     }
 
-    if ($uploadAttachments && @attachments) {
-	unless (-d $twikiPubDir) {
-	    warn "TWiki pub directory not found: $twikiPubDir\n";
-	} else {
-	    for my $info (@attachments) {
-		my $name = $info->{name};
-		my $path = "$twikiPubDir/$stub/$name";
-		unless (-e $path) {
-		    warn "Attachment not found: $name\n";
-		} else {
-		    my $tempdir = File::Temp->newdir();
-		    system "cp $path $tempdir/$stub.$name";
-		    my $extensions = "";
-		    if ($name =~ /\.([^\.]+)$/) { $extensions = "--extensions=" . $1 }
-		    my $comment = $info->{comment};
-		    my $epoch = $info->{date};
-		    my $dt = DateTime->from_epoch( epoch => $epoch );
-		    my $mwDate = $dt->ymd('') . $dt->hms('');
-		    my $mwUser = ($user or spaceWikiWord($info->{user}));
-		    run_maintenance_script ("$uploadScript $extensions --overwrite --user='$mwUser' --summary='$summary' --comment='$comment' --timestamp=$mwDate $tempdir");
-		}
+    unless (-d $twikiPubDir) {
+	warn "TWiki pub directory not found: $twikiPubDir\n";
+    } else {
+	# Auto-add any linked attachments
+	my %gotWebTopicFile;
+	for my $info (@attachments) { ++$gotWebTopicFile{"$info->{web} $info->{topic} $info->{name}"} }
+	for my $info (@linkedAttachments) {
+	    unless ($gotWebTopicFile{"$info->{web} $info->{topic} $info->{name}"}++) {
+		push @attachments, $info;
+	    }
+	}
+
+	# Upload
+	my %uploaded;
+	for my $info (@attachments) {
+	    my $attachName = $info->{name};
+	    my $attachWeb = $info->{web};
+	    my $attachTopic = $info->{topic};
+	    my $path = "$twikiPubDir/$attachWeb/$attachTopic/$attachName";
+	    unless (-e $path) {
+		warn "Attachment not found: $path\n";
+	    } else {
+		my $tempdir = File::Temp->newdir();
+		my $filename = "$attachTopic.$attachName";  # we include the topic but not the web name in the autogenerated attachment filename, so we need to check for duplicates
+		warn "Duplicate attachment file $filename\n" if $uploaded{$filename}++;
+		system "cp $path $tempdir/$filename";
+		my $extensions = "";
+		if ($attachName =~ /\.([^\.]+)$/) { $extensions = "--extensions=" . $1 }
+		my $comment = $info->{comment};
+		my $epoch = $info->{date} || time();
+		my $dt = DateTime->from_epoch( epoch => $epoch );
+		my $mwDate = $dt->ymd('') . $dt->hms('');
+		my $mwUser = ($user or (defined($info->{user}) ? spaceWikiWord($info->{user}) : undef));
+		my $userArg = defined($mwUser) ? "--user='$mwUser'" : "";
+		my $commentArg = defined($comment) ? "--comment='$comment'" : "";
+		warn "Uploading $filename\n" if $verbose;
+		run_maintenance_script ("$uploadScript $extensions --overwrite $userArg $commentArg --summary='$summary' --timestamp=$mwDate $tempdir");
 	    }
 	}
     }
@@ -461,11 +482,24 @@ sub setTopicInfo {
 }
 
 sub addAttachment {
-    my ($info) = @_;
-    my %info;
-    while ($info =~ /([a-z]+)="(.*?)"/g) { $info{$1} = $2 }
-    push @attachments, \%info;
+    my ($info, $web, $topic) = @_;
+    if ($uploadAttachments) {
+	my %info = ('web' => $web, 'topic' => $topic);
+	while ($info =~ /([a-z]+)="(.*?)"/g) { $info{$1} = $2 }
+	push @attachments, \%info;
+    }
     return "";
+}
+
+sub attachmentLink {
+    my ($web, $topic, $name) = @_;
+    push @linkedAttachments, {'name' => $name, 'web' => $web, 'topic' => $topic};
+    return attachmentLinkPrefix($web,$topic) . $name;
+}
+
+sub attachmentLinkPrefix {
+    my ($web, $topic) = @_;
+    return "Media:$topic.";
 }
 
 sub run_maintenance_script {
