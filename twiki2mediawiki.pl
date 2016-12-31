@@ -176,7 +176,7 @@ my @rules= (
     q#s/<(\/?)dot>/<$1graphviz>/g#,
 
     # Anchors
-    q%s/^\s*#(\S+)\s*$/<div id="$1"></div>/g%,  # replace anchors with empty div's
+    q%s/^\s*#(\S+)\s*$/<div id="$1"><\/div>/g%,  # replace anchors with empty div's
     
     # 
     # Links 
