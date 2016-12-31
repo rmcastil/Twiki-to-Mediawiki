@@ -1,10 +1,3 @@
-Installation
-------------
-
-Requires:
-- Perl
-- [DateTime](http://search.cpan.org/~drolsky/DateTime-1.42/lib/DateTime.pm)
-
 Summary
 -------
 
@@ -26,6 +19,13 @@ Run `twiki2mediawiki.pl` to convert a TWiki web to MediaWiki.
     - Converts [DirectedGraphPlugin](http://twiki.org/cgi-bin/view/Plugins/DirectedGraphPlugin) to [Extension:GraphViz](https://www.mediawiki.org/wiki/Extension:GraphViz)
 
 For help/options: `twiki2mediawiki.pl -h`
+
+Installation
+------------
+
+Requires:
+- Perl
+- [DateTime](http://search.cpan.org/~drolsky/DateTime-1.42/lib/DateTime.pm)
 
 License
 -------
