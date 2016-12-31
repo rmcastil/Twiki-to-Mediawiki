@@ -1,10 +1,9 @@
-License
--------
+Installation
+------------
 
-The original twiki2mediawiki.pl source, and @rmcastil's derivative, are under the GPL license.
-The original sources can be found here:
-- https://github.com/rmcastil/Twiki-to-Mediawiki
-- http://it.toolbox.com/wiki/index.php/Twiki2mediawiki
+Requires:
+- Perl
+- [DateTime](http://search.cpan.org/~drolsky/DateTime-1.42/lib/DateTime.pm)
 
 Summary
 -------
@@ -17,6 +16,7 @@ Run `twiki2mediawiki.pl` to convert a TWiki web to MediaWiki.
     - Optionally rename to Mediawiki-style links using [moveBatch.php](https://www.mediawiki.org/wiki/Manual:MoveBatch.php)
 - Optionally import attachments using [importImages.php](https://www.mediawiki.org/wiki/Manual:ImportImages.php)
     - Attachments from other pages & webs are automatically included
+- Preserves timestamps (but not revision history) and usernames (but doesn't create users)
 - Converts most formatting including lists & tables
 - Converts some built-in TWiki variables including e.g. `%TOPIC%`, `%INCLUDE%`, `%ICON%`, `%ATTACHURL%`, `%DATE%`
 - Handles TWiki variables that are defined in the page, or in TWikiPreferences or WebPreferences
@@ -27,6 +27,13 @@ Run `twiki2mediawiki.pl` to convert a TWiki web to MediaWiki.
 
 For help/options: `twiki2mediawiki.pl -h`
 
+License
+-------
+
+The original twiki2mediawiki.pl source, and @rmcastil's derivative, are under the GPL license.
+The original sources can be found here:
+- https://github.com/rmcastil/Twiki-to-Mediawiki
+- http://it.toolbox.com/wiki/index.php/Twiki2mediawiki
 
 Disclaimer
 ----------
