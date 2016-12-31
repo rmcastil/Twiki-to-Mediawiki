@@ -259,7 +259,17 @@ sub _translateText {
 
 sub makeLink {
     my ($link, $text) = @_;
-    return ($link eq $text) ? "[<nop>$link]" : "[<nop>$link|<nop>$text]";
+    return $link =~ /^http/ ? makeInternalLink($link,$text) : makeExternalLink($link,$text);
+}
+
+sub makeInternalLink {
+    my ($link, $text) = @_;
+    return ($link eq $text) ? "[[<nop>$link]]" : "[[<nop>$link|<nop>$text]]";
+}
+
+sub makeExternalLink {
+    my ($link, $text) = @_;
+    return ($link eq $text) ? "<nop>$link" : "[<nop>$link <nop>$text]";
 }
 
 sub makeWikiWord {
