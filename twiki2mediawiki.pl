@@ -319,13 +319,9 @@ for my $twikiFile (@twikiFiles) {
     # since %META:PREFERENCE{...}% tags at the end of the file are retroactive
     parseTwikiVars ($twikiFile);
 
-    # Open input & output files
+    # Open input file & initialize output array
     open(TWIKI,"<$twikiFile") or die("unable to open $twikiFile - $!"); 
-    if ($no_file) {
-	*MEDIAWIKI = *STDOUT;
-    } else {
-	open(MEDIAWIKI,">$mediawikiFile") or die("unable to open $mediawikiFile - $!");
-    }
+    my @output;
 
     # Initialize state
     my $convertingTable = 0;  # are we in the middle of a table conversion?
@@ -335,7 +331,7 @@ for my $twikiFile (@twikiFiles) {
 	# Handle Table Endings 
 	# 
 	if ($convertingTable && /^[^\|]/) { 
-	    printMediawiki ("|}\n\n"); 
+	    push @output, "|}\n\n"; 
 	    $convertingTable = 0; 
 	} 
 	# 
@@ -345,33 +341,47 @@ for my $twikiFile (@twikiFiles) {
 	# 
 	if (/\|/) { 	# Is this the first row of the table? If so, add header 
 	    if (!$convertingTable) { 
-		printMediawiki ("{| border=\"1\"\n"); 
+		push @output, "{| border=\"1\"\n"; 
 		$convertingTable = 1; 
 	    } 		# start new row 
-	    printMediawiki ("|-\n"); 
+	    push @output, "|-\n"; 
 	    my $arAnswer = $_; 
 	    $arAnswer =~ s/\|$//; 		#remove end pipe. 
 	    $arAnswer =~ s/(.)\|(.)/$1\|\|$2/g; 		#Change single pipe to double pipe. 
 	    my $text = _translateText($arAnswer); 
-	    printMediawiki ("$text\n"); 
+	    push @output, "$text\n"; 
 	    # 
 	    # Handle blank lines.. 
 	    # 
 	} 
 	elsif (/^$/) { 
-	    printMediawiki ("$_\n");
+	    push @output, "$_\n";
 	    # 
 	    # Handle anything else... 
 	    # 
 	} 
 	else { 
 	    my $text = _translateText($_); 
-	    printMediawiki ("$text\n"); 
+	    push @output, "$text\n"; 
 	}
     } # end while. 
     close(TWIKI); 
-    unless ($no_file) {
-	close(MEDIAWIKI) or die("unable to close $mediawikiFile - $!");
+
+    # close <onlyinclude> tag, if necessary
+    my $gotStartInclude = grep (/<onlyinclude>/, @output);
+    my $gotStopInclude = grep (/<\/onlyinclude>/, @output);
+    if ($gotStartInclude && !$gotStopInclude) { push @output, "</onlyinclude>\n" }
+    elsif (!$gotStartInclude && $gotStopInclude) { unshift @output, "<onlyinclude>\n" }
+
+    # print output
+    if ($no_file) {
+	print @output;
+    } else {
+	unless ($dryRun && !$useStdout && !$keepPageFiles) {
+	    open(MEDIAWIKI,">$mediawikiFile") or die("unable to open $mediawikiFile - $!");
+	    print MEDIAWIKI @output;
+	    close(MEDIAWIKI) or die("unable to close $mediawikiFile - $!");
+	}
     }
 
     # Change file timestamp
@@ -592,13 +602,6 @@ sub getTwikiPrefsFiles {
 		"$dir/../TWiki/TWikiPreferences.txt",
 		"$dir/TWikiPreferences.txt",
 		"$dir/WebPreferences.txt");
-}
-    
-sub printMediawiki {
-    my (@text) = @_;
-    unless ($dryRun && !$useStdout && !$keepPageFiles) {
-	print MEDIAWIKI @text;
-    }
 }
 
 sub getStub {
