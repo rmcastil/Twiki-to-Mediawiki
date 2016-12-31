@@ -27,31 +27,42 @@ use warnings;
 use Getopt::Long;
 use File::Basename;
 use Cwd qw(abs_path);
+use File::Temp;
+use DateTime;
 
-my ($dir, $stdout, $imp, $keep, $user);
+my ($dir, $pubdir, $stdout, $imp, $keep, $user, $upload, $dryrun);
 my $mwdir = "/var/www/wiki";
 my $outdir = ".";
+my $php = "php";
 my $impScript = "importTextFiles.php";
+my $uploadScript = "importImages.php";
 my $summary = "Imported from TWiki";
 
 my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
-    . " -dir <dir>      Convert all .txt files in directory\n"
-    . " -outdir <dir>   Output directory (default '$outdir')\n"
+    . " -data <dir>     Convert all .txt files in directory\n"
+    . " -pub <dir>      Location of TWiki pub directory\n"
+    . " -out <dir>      Output directory (default '$outdir')\n"
     . " -stdout         Print to stdout instead of file\n"
     . " -import         Run MediaWiki $impScript script\n"
     . " -keep           Keep MediaWiki file after import\n"
     . " -user <name>    Username for import (overrides TWiki author)\n"
     . " -summary <desc> Summary of edit (default '$summary')\n"
-    . " -mwdir <dir>    Location of MediaWiki (default '$mwdir')\n";
+    . " -mwdir <dir>    Location of MediaWiki (default '$mwdir')\n"
+    . " -upload         Run MediaWiki $uploadScript script\n"
+    . " -dryrun         Print MediaWiki scripts but don't run them\n"
+    ;
 
-GetOptions ("dir=s" => \$dir,
-	    "outdir=s" => \$outdir,
+GetOptions ("data=s" => \$dir,
+	    "pub=s" => \$pubdir,
+	    "out=s" => \$outdir,
 	    "stdout" => \$stdout,
 	    "import" => \$imp,
 	    "keep" => \$keep,
 	    "user=s" => \$user,
 	    "summary=s" => \$summary,
-	    "mwdir=s" => \$mwdir)
+	    "mwdir=s" => \$mwdir,
+	    "upload" => \$upload,
+	    "dryrun" => \$dryrun)
   or die("Error in command line arguments\n" . $usage);
 die $usage unless @ARGV or $dir;
 
@@ -73,11 +84,12 @@ if ($dir) {
 # 
 # *Quoting with a percent ("%") or hash ("#") sign. 
 #
-my ($author, $date);
+my ($author, $date, @attachments);
 my @rules= ( 
 
     # %META%
     q#s/^%META:TOPICINFO{author="(.*?)" date="(.*?)".*/setTopicInfo($1,$2)/ge#, # 
+    q#s/^%META:FILEATTACHMENT{(.*)}%/addAttachment($1)/ge#, # 
     q#s/^%META.*//g#, # Remove remaining meta tags 
     
     # %INCLUDE%
@@ -170,21 +182,37 @@ my @rules= (
     );
 
 for my $twikiFile (@twikiFiles) {
-    my $mediawikiPage = basename($twikiFile);
-    $mediawikiPage =~ s/.txt$//;
-    my $mediawikiFile = abs_path($outdir) . '/' . $mediawikiPage;
+    # Get file & dir names
+    my $stub = basename($twikiFile);
+    $stub =~ s/.txt$//;
+    my $mediawikiFile = abs_path($outdir) . '/' . $stub;
 
-    # are we in the middle of a table conversion. 
-    # ================================================================ 
-    my $convertingTable = 0; 
+    my $twikiPubDir;
+    if ($upload) {
+	if (defined $pubdir) {
+	    $twikiPubDir = $pubdir;
+	} else {
+	    # try to guess the TWiki pub directory
+	    my $dataDir = dirname(abs_path($twikiFile));
+	    my $web = basename($dataDir);
+	    $twikiPubDir = abs_path("$dataDir/../../pub/$web");
+	}
+    }
 
+    # Reset globals
+    $author = $date = undef;
+    @attachments = ();
+
+    # Open file
     open(TWIKI,"<$twikiFile") or die("unable to open $twikiFile - $!"); 
     if ($no_file) {
 	*MEDIAWIKI = *STDOUT;
     } else {
 	open(MEDIAWIKI,">$mediawikiFile") or die("unable to open $mediawikiFile - $!");
     }
-    $author = $date = undef;
+
+    # Initialize state
+    my $convertingTable = 0;  # are we in the middle of a table conversion?
     while(<TWIKI>) { 
 	chomp; 
 	# 
@@ -230,18 +258,44 @@ for my $twikiFile (@twikiFiles) {
 	close(MEDIAWIKI) or die("unable to close $mediawikiFile - $!");
     }
 
+    # Change file timestamp
     my $use_timestamp = "";
     if ($date) {
 	utime ($date, $date, $mediawikiFile);
 	$use_timestamp = "--use-timestamp";
     }
+
+    # Do Mediawiki import/upload
     if ($imp) {
-	if ($stdout) { system "cat $mediawikiFile" }
 	my $mwUser = ($user or $author);
-	my $cmd = "php $impScript --bot --overwrite --user '$mwUser' --summary '$summary' $use_timestamp";
-	warn "$cmd\n";
-	system "cd $mwdir/maintenance; $cmd";
+	if ($stdout) { system "cat $mediawikiFile" }
+	run_maintenance_script ("$impScript --bot --overwrite --user='$mwUser' --summary='$summary' $use_timestamp");
 	unlink($mediawikiFile) unless $keep;
+    }
+
+    if ($upload && @attachments) {
+	unless (-d $twikiPubDir) {
+	    warn "TWiki pub directory not found: $twikiPubDir\n";
+	} else {
+	    for my $info (@attachments) {
+		my $name = $info->{name};
+		my $path = "$twikiPubDir/$stub/$name";
+		unless (-e $path) {
+		    warn "Attachment not found: $name\n";
+		} else {
+		    my $tempdir = File::Temp->newdir();
+		    system "cp $path $tempdir/$stub:$name";
+		    my $extensions = "";
+		    if ($name =~ /\.([^\.]+)$/) { $extensions = "--extensions=" . $1 }
+		    my $comment = $info->{comment};
+		    my $epoch = $info->{date};
+		    my $dt = DateTime->from_epoch( epoch => $epoch );
+		    my $mwDate = $dt->ymd('') . $dt->hms('');
+		    my $mwUser = ($user or spaceWikiWord($info->{user}));
+		    run_maintenance_script ("$uploadScript $extensions --overwrite --user='$mwUser' --summary='$summary' --comment='$comment' --timestamp=$mwDate $tempdir");
+		}
+	    }
+	}
     }
 }
 
@@ -295,5 +349,21 @@ sub setTopicInfo {
     return "";
 }
 
+sub addAttachment {
+    my ($info) = @_;
+    my %info;
+    while ($info =~ /([a-z]+)="(.*?)"/g) { $info{$1} = $2 }
+    push @attachments, \%info;
+    return "";
+}
+
+sub run_maintenance_script {
+    my ($script) = @_;
+    my $cmd = "$php $script";
+    warn "$cmd\n";
+    unless ($dryrun) {
+	system "cd $mwdir/maintenance; $cmd";
+    }
+}
+
 1;
-    
