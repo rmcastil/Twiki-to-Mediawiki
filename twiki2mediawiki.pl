@@ -71,7 +71,7 @@ my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
     . " -keep           Keep MediaWiki file after import\n"
     . " -user <name>    Username for import (overrides TWiki author)\n"
     . " -summary <desc> Summary of edit (default '$summary')\n"
-    . " -mwDir <dir>    Location of MediaWiki (default '$mwDir')\n"
+    . " -mw <dir>       Location of MediaWiki (default '$mwDir')\n"
     . " -upload         Run MediaWiki $uploadScript script\n"
     . " -dryrun         Don't run MediaWiki scripts or save files\n"
     . " -verbose        Print more stuff\n"
@@ -88,7 +88,7 @@ GetOptions ("data=s" => \$dataDir,
 	    "keep" => \$keepPageFiles,
 	    "user=s" => \$user,
 	    "summary=s" => \$summary,
-	    "mwDir=s" => \$mwDir,
+	    "mw=s" => \$mwDir,
 	    "upload" => \$uploadAttachments,
 	    "dryrun" => \$dryRun,
 	    "verbose" => \$verbose)
