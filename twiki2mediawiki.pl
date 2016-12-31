@@ -119,6 +119,11 @@ my @rules= (
     q#s/%TOPIC%/$topic/g#,
     q#s/%SPACEDTOPIC%/spaceWikiWord($topic)/eg#,
 
+    # %WEB%, %MAINWEB%, %TWIKIWEB%
+    q#s/%WEB%/$web/g#,
+    q#s/%MAINWEB%/Main/g#,
+    q#s/%TWIKIWEB%/TWiki/g#,
+
     # %DATE% and %DISPLAYTIME%
     q#s/%DATE%/{{CURRENTYEAR}}-{{CURRENTMONTH}}-{{CURRENTDAY}}/g#,
     q#s/%DISPLAYTIME%/{{CURRENTYEAR}}-{{CURRENTMONTH}}-{{CURRENTDAY}} {{CURRENTTIME}/g#,
@@ -135,7 +140,7 @@ my @rules= (
     q#s/%STOPINCLUDE%/<\/onlyinclude>/#,
 
     # EfetchPlugin -> Extension:PubmedParser
-    q@s/%PMID[LC]?\{\s*(\d+)\s*\}%/{{\#pmid:$1}}/g@,
+    q@s/%PMID[LC]?\{\s*(\S+?)\s*\}%/{{\#pmid:$1}}/g@,
     q@s/%PMIDL\{.*?pmid="?(\d+)"?.*?\}%/{{\#pmid:$1}}/g@,
     
     # LatexModePlugin -> Extension:Math
@@ -220,8 +225,11 @@ my @rules= (
     
     );
 
-my @ignoredVars = qw(ADDTOHEAD ALLVARIABLES BASETOPIC BASEWEB CONTENTMODE CRYPTTOKEN DISKID EDITFORMFIELD ENCODE ENTITY ENV FORMFIELD GMTIME GROUPS HIDE HIDEINPRINT HTTP_HOST HTTP HTTPS IF INCLUDINGTOPIC INCLUDINGWEB INTURLENCODE LANGUAGES MAKETEXT MDREPO METASEARCH NOP PARENTTOPIC PLUGINVERSION QUERYPARAMS QUERYSTRING RELATIVETOPICPATH REMOTE_ADDR REMOTE_PORT REMOTE_USER RENDERHEAD REVINFO REVTITLE REVARG SCRIPTNAME SCRIPTURL SCRIPTURLPATH SEARCH SEP SERVERTIME SPACEOUT TOPICLIST TOPICTITLE TRASHWEB URLENCODE URLPARAM LANGUAGE USERINFO USERNAME VAR WEB WEBLIST WIKINAME WIKIUSERNAME WIKIWEBMASTER WIKIWEBMASTERNAME ENDSECTION WIKIVERSION STARTSECTION REDIRECT TOC ALLOWLOGINNAME AUTHREALM DEFAULTURLHOST HOMETOPIC LOCALSITEPREFS NOFOLLOW NOTIFYTOPIC SCRIPTSUFFIX SITESTATISTICSTOPIC STATISTICSTOPIC SYSTEMWEB TRASHWEB TWIKIADMINLOGIN USERSWEB WEBPREFSTOPIC WIKIPREFSTOPIC WIKIUSERSTOPIC USERPREFSTOPIC CHARSET LANG TOPICMAP COMMENT TGPOPUP CALENDAR TABLE LABLOG HEADLINES SESSIONLOGON VARIABLES);
+my @ignoredVars = qw(ADDTOHEAD ALLOWLOGINNAME ALLVARIABLES AUTHREALM BASETOPIC BASEWEB CALENDAR CHARSET COMMENT CONTENTMODE CRYPTTOKEN DEFAULTURLHOST DISKID EDITFORMFIELD ENCODE ENDSECTION ENTITY ENV FORMFIELD GMTIME GROUPS HEADLINES HIDE HIDEINPRINT HOMETOPIC HTTP HTTPS HTTP_HOST IF INCLUDINGTOPIC INCLUDINGWEB INTURLENCODE LABLOG LANG LANGUAGE LANGUAGES LOCALSITEPREFS MAKETEXT MDREPO METASEARCH NOFOLLOW NOP NOTIFYTOPIC PARENTTOPIC PLUGINVERSION QUERYPARAMS QUERYSTRING REDIRECT RELATIVETOPICPATH REMOTE_ADDR REMOTE_PORT REMOTE_USER RENDERHEAD REVARG REVINFO REVTITLE SCRIPTNAME SCRIPTSUFFIX SCRIPTURL SCRIPTURLPATH SEARCH SEP SERVERTIME SESSIONLOGON SITESTATISTICSTOPIC SPACEOUT STARTSECTION STATISTICSTOPIC SYSTEMWEB TABLE TGPOPUP TOC TOPICLIST TOPICMAP TOPICTITLE TRASHWEB TWIKIADMINLOGIN URLENCODE URLPARAM USERINFO USERNAME USERPREFSTOPIC USERSWEB VAR VARIABLES WEBLIST WEBPREFSTOPIC WIKINAME WIKIPREFSTOPIC WIKIUSERNAME WIKIUSERSTOPIC WIKIVERSION WIKIWEBMASTER WIKIWEBMASTERNAME);
 my %ignoreVar = map (($_ => 1), @ignoredVars);
+
+my @ignoredPages = qw(AllAuthUsersGroup AllUsersGroup ChangeProfilePicture NobodyGroup PatternSkinUserViewTemplate TWikiAdminGroup TWikiAdminUser TWikiContributor TWikiGroups TWikiGroupTemplate TWikiGuest TWikiPreferences TWikiRegistrationAgent UnknownUser UserListByDateJoined UserListByLocation UserListHeader UserList UserProfileHeader UserViewTemplate WebAtom WebChanges WebCreateNewTopic WebHome WebIndex WebLeftBar WebNotify WebPreferences WebRss WebSearchAdvanced WebSearchAttachments WebSearch WebStatistics WebTopicList WebTopMenu);
+my %ignorePage = map (($_ => 1), @ignoredPages);
 
 # TODO: implement...
 # ATTACHURL ATTACHURLPATH PUBURL PUBURLPATH
@@ -232,7 +240,9 @@ my %twikiVarBase = %twikiVar;
 
 my @found;
 for my $twikiFile (@twikiFiles) {
-    if (-e $twikiFile) {
+    if ($ignorePage{getStub($twikiFile)}) {
+	warn "Ignoring TWiki page $twikiFile\n" if $verbose;
+    } elsif (-e $twikiFile) {
 	push @found, $twikiFile;
     } else {
 	warn "Can't find $twikiFile\n";
@@ -465,14 +475,19 @@ sub setTwikiVar {
 
 sub getTwikiVar {
     my ($var, $args) = @_;
+    my $ret;
     if (exists $twikiVar{$var}) {
-	return _translateText($twikiVar{$var});
-    } elsif (!$ignoreVar{$var}) {
-	unless ($warned{$var}++) {
-	    warn "Unknown variable: \%$var$args\%\t($topic)\n";
+	$ret = _translateText($twikiVar{$var});
+    } elsif ($ignoreVar{$var}) {
+	$ret = "";
+    } else {
+	my $orig = "\%$var$args\%";
+	unless ($warned{$orig}++) {
+	    warn "Unknown variable: $orig\t($topic)\n";
 	}
+	$ret = $orig;
     }
-    return "";
+    return $ret;
 }
 
 sub parseTwikiVars {
