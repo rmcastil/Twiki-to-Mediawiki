@@ -488,9 +488,10 @@ sub _translateText {
 
 sub makeLink {
     my ($link, $text) = @_;
+    my $isAnchor = ($link =~ /^#/);
     my $isInternal = ($link =~ /^[A-Za-z0-9\.]+$/);
     my $isInterwiki = ($link =~ /([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*?))/);
-    return ($isInternal || $isInterwiki) ? makeInternalLink($link,$text) : makeExternalLink($link,$text);
+    return ($isAnchor || $isInternal || $isInterwiki) ? makeInternalLink($link,$text) : makeExternalLink($link,$text);
 }
 
 sub makeInternalLink {
