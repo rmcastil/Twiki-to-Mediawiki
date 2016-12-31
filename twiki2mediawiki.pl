@@ -419,7 +419,7 @@ sub setTwikiVar {
 sub getTwikiVar {
     my ($var) = @_;
     if (exists $twikiVar{$var}) {
-	return $twikiVar{$var};
+	return _translateText($twikiVar{$var});
     } else {
 	unless ($warned{$var}++) {
 	    warn "Unknown variable: $var\n";
