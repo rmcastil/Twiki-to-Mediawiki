@@ -33,6 +33,7 @@ use DateTime;
 # Options that are disabled/empty by default
 my ($verbose,
     $dataDir,
+    $outDir,
     $pubDir,
     $useStdout,
     @varFiles,
@@ -45,8 +46,7 @@ my ($verbose,
     $dryRun);
 
 # Mediawiki globals & options
-my $mwdir = "/var/www/wiki";
-my $outdir = ".";
+my $mwDir = "/var/www/wiki";
 my $php = "php";
 my $summary = "Imported from TWiki";
 
@@ -61,7 +61,7 @@ my $web = "Main";
 # Parse command line
 my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
     . " -data <dir>     Convert all .txt files in directory\n"
-    . " -out <dir>      Output directory (default '$outdir')\n"
+    . " -out <dir>      Output directory\n"
     . " -stdout         Print to stdout instead of file\n"
     . " -vars <file>    Parse TWiki variable definitions from file\n"
     . " -delete         Delete using $deleteScript\n"
@@ -71,7 +71,7 @@ my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
     . " -keep           Keep MediaWiki file after import\n"
     . " -user <name>    Username for import (overrides TWiki author)\n"
     . " -summary <desc> Summary of edit (default '$summary')\n"
-    . " -mwdir <dir>    Location of MediaWiki (default '$mwdir')\n"
+    . " -mwDir <dir>    Location of MediaWiki (default '$mwDir')\n"
     . " -upload         Run MediaWiki $uploadScript script\n"
     . " -dryrun         Don't run MediaWiki scripts or save files\n"
     . " -verbose        Print more stuff\n"
@@ -79,7 +79,7 @@ my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
 
 GetOptions ("data=s" => \$dataDir,
 	    "pub=s" => \$pubDir,
-	    "out=s" => \$outdir,
+	    "out=s" => \$outDir,
 	    "stdout" => \$useStdout,
 	    "vars=s" => \@varFiles,
 	    "delete" => \$deletePages,
@@ -88,14 +88,14 @@ GetOptions ("data=s" => \$dataDir,
 	    "keep" => \$keepPageFiles,
 	    "user=s" => \$user,
 	    "summary=s" => \$summary,
-	    "mwdir=s" => \$mwdir,
+	    "mwDir=s" => \$mwDir,
 	    "upload" => \$uploadAttachments,
 	    "dryrun" => \$dryRun,
 	    "verbose" => \$verbose)
   or die("Error in command line arguments\n" . $usage);
 die $usage unless @ARGV or $dataDir;
 
-my $no_file = ($useStdout && !$importPages) || $dryRun;
+my $no_file = ($useStdout && !$importPages) || ($dryRun && !$keepPageFiles);
 
 # Build list of files
 my @twikiFiles;
@@ -104,6 +104,7 @@ if ($dataDir) {
     @twikiFiles = map ("$dataDir/$_", grep (/\.txt$/, readdir(DIR)));
     closedir DIR;
     push @varFiles, getTwikiPrefsFiles($dataDir);
+    $web = basename($dataDir);
 } else {
     @twikiFiles = @ARGV;
 }
@@ -130,6 +131,11 @@ my @rules= (
     q#s/%MAINWEB%/Main/g#,
     q#s/%TWIKIWEB%/TWiki/g#,
 
+    # ICON
+    q#s/%ICON{\"?(.+?)\"?}%/<img src="%ICONURLPATH{$1}%"\/>/g#,   # will get expanded again by %ICONURLPATH% rule
+    q#s/%ICONURL{\"?(.+?)\"?}%/%ICONURLPATH{$1}%/g#,   # will get expanded again by %ICONURLPATH% rule
+    q#s/%ICONURLPATH{\"?(.+?)\"?}%/%PUBURL%\/TWiki\/TWikiDocGraphics\/$1.gif/g#,   # will get expanded again by %PUBURL% rule
+    
     # ATTACHURL, PUBURL
     q#s/%ATTACHURL%\//attachmentLinkPrefix($web,$topic)/ge#,
     q#s/%ATTACHURLPATH%\//attachmentLinkPrefix($web,$topic)/ge#,
@@ -275,13 +281,21 @@ if ($deletePages) {
 	run_maintenance_script ("$deleteScript $tmpFilename");
 }
 
+# Create temp dir for pages, if appropriate
+my $mwOutDir;
+if ($outDir) {
+    $mwOutDir = abs_path($outDir);
+} else {
+    $mwOutDir = File::Temp->newdir (CLEANUP => !$keepPageFiles);
+}
+
 # Convert
 for my $twikiFile (@twikiFiles) {
     warn "Processing $twikiFile\n" if $verbose;
     # Get file & dir names
     my $twikiFileDir = dirname(abs_path($twikiFile));
     my $stub = getStub($twikiFile);
-    my $mediawikiFile = abs_path($outdir) . '/' . $stub;
+    my $mediawikiFile = "$mwOutDir/$stub";
 
     # Reset page-specific globals
     $author = $date = undef;
@@ -359,7 +373,7 @@ for my $twikiFile (@twikiFiles) {
     if ($importPages) {
 	my $mwUser = ($user or $author);
 	if ($useStdout) { system "cat $mediawikiFile" }
-	run_maintenance_script ("$importScript --bot --overwrite --user='$mwUser' --summary='$summary' $use_timestamp");
+	run_maintenance_script ("$importScript --bot --overwrite --user='$mwUser' --summary='$summary' $use_timestamp $mediawikiFile");
 	unlink($mediawikiFile) unless $keepPageFiles;
     }
 }
@@ -425,6 +439,11 @@ if ($uploadAttachments && (@attachments || @linkedAttachments)) {
 	    }
 	}
     }
+}
+
+# Show location of page files
+if ($keepPageFiles && !$outDir) {
+    warn "Page files are in $mwOutDir\n";
 }
 
 # ================================================================ 
@@ -507,7 +526,7 @@ sub run_maintenance_script {
     my $cmd = "$php $script";
     warn "$cmd\n";
     unless ($dryRun) {
-	system "cd $mwdir/maintenance; $cmd";
+	system "cd $mwDir/maintenance; $cmd";
     }
 }
 
@@ -563,7 +582,7 @@ sub getTwikiPrefsFiles {
     
 sub printMediawiki {
     my (@text) = @_;
-    unless ($dryRun && !$useStdout) {
+    unless ($dryRun && !$useStdout && !$keepPageFiles) {
 	print MEDIAWIKI @text;
     }
 }
