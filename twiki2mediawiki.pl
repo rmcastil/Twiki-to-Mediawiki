@@ -255,14 +255,6 @@ for my $twikiFile (@twikiFiles) {
 }
 @twikiFiles = @found;
 
-if ($deletePages) {
-    my $tmp = File::Temp->new();
-    print $tmp map (getStub($_)."\n", @twikiFiles);
-    close $tmp;
-    my $tmpFilename = $tmp->filename;
-    run_maintenance_script ("$deleteScript $tmpFilename");
-}
-
 for my $twikiFile (@twikiFiles) {
     # Get file & dir names
     my $stub = getStub($twikiFile);
@@ -350,12 +342,31 @@ for my $twikiFile (@twikiFiles) {
 	$use_timestamp = "--use-timestamp";
     }
 
-    # Do Mediawiki import/upload
+    # Do Mediawiki delete/import/rename/upload
+    if ($deletePages) {
+	my $tmp = File::Temp->new();
+	print $tmp map (getStub($_)."\n", @twikiFiles);
+	if ($renamePages) {
+	    print $tmp map (spaceWikiWord(getStub($_))."\n", @twikiFiles);
+	}
+	close $tmp;
+	my $tmpFilename = $tmp->filename;
+	run_maintenance_script ("$deleteScript $tmpFilename");
+    }
+
     if ($importPages) {
 	my $mwUser = ($user or $author);
 	if ($useStdout) { system "cat $mediawikiFile" }
 	run_maintenance_script ("$importScript --bot --overwrite --user='$mwUser' --summary='$summary' $use_timestamp");
 	unlink($mediawikiFile) unless $keepPageFiles;
+    }
+    
+    if ($renamePages) {
+	my $tmp = File::Temp->new();
+	print $tmp map ($_."|".spaceWikiWord($_)."\n", map (getStub($_), @twikiFiles));
+	close $tmp;
+	my $tmpFilename = $tmp->filename;
+	run_maintenance_script ("$moveScript --r='Rename from TWiki to MediaWiki style' $tmpFilename");
     }
 
     if ($uploadAttachments && @attachments) {
@@ -403,6 +414,7 @@ sub makeLink {
 
 sub makeInternalLink {
     my ($link, $text) = @_;
+    if ($renamePages) { $link = spaceWikiWord($link) }
     return ($link eq $text) ? "[[<nop>$link]]" : "[[<nop>$link|<nop>$text]]";
 }
 
