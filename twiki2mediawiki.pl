@@ -30,7 +30,7 @@ use Cwd qw(abs_path);
 use File::Temp;
 use DateTime;
 
-my ($verbose, $dir, $pubdir, $stdout, $imp, $keep, $user, $upload, $dryrun);
+my ($verbose, $dir, $pubdir, $stdout, @varFiles, $imp, $keep, $user, $upload, $dryrun);
 my $mwdir = "/var/www/wiki";
 my $outdir = ".";
 my $php = "php";
@@ -43,6 +43,7 @@ my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
     . " -pub <dir>      Location of TWiki pub directory\n"
     . " -out <dir>      Output directory (default '$outdir')\n"
     . " -stdout         Print to stdout instead of file\n"
+    . " -vars <file>    Parse TWiki variable definitions from file\n"
     . " -import         Run MediaWiki $impScript script\n"
     . " -keep           Keep MediaWiki file after import\n"
     . " -user <name>    Username for import (overrides TWiki author)\n"
@@ -57,6 +58,7 @@ GetOptions ("data=s" => \$dir,
 	    "pub=s" => \$pubdir,
 	    "out=s" => \$outdir,
 	    "stdout" => \$stdout,
+	    "vars=s" => \@varFiles,
 	    "import" => \$imp,
 	    "keep" => \$keep,
 	    "user=s" => \$user,
@@ -72,8 +74,10 @@ my $no_file = ($stdout && !$imp) || $dryrun;
 
 my @twikiFiles;
 if ($dir) {
-    opendir DIR, $dir;
+    opendir DIR, $dir or die "Couldn't open $dir: $!";
     @twikiFiles = map ("$dir/$_", grep (/\.txt$/, readdir(DIR)));
+    push @varFiles, grep (/\bTWikiPreferences\.txt$/, @twikiFiles);
+    push @varFiles, grep (/\bWebPreferences\.txt$/, @twikiFiles);
     closedir DIR;
 } else {
     @twikiFiles = @ARGV;
@@ -86,8 +90,11 @@ if ($dir) {
 # 
 # *Quoting with a percent ("%") or hash ("#") sign. 
 #
-my ($author, $date, @attachments, $topic, %warned_unknown);  # global variables used by parser
+my ($author, $date, @attachments, $topic, %twikiVar, %warned);  # global variables used by parser
 my @rules= ( 
+
+    # Set variable
+    q#s/^\s+\* +Set +([A-Za-z]+) += +(.*)/setTwikiVar($1,$2)/ge#,
 
     # %TOPIC%
     q#s/%TOPIC%/$topic/g#,
@@ -185,10 +192,27 @@ my @rules= (
     q%s/(^|[\n\r])[ ]{30}[0-9]\.? /$1\#\#\#\#\#\#\#\#\#\# /%, # level 10 bullet 
     q%s/(^|[\n\r])[ ]{3}\$ ([^\:]*)/$1\; $2 /g%, # $ definition: term 
 
-    # Uncaught variables
-    q#s/(%[A-Z]+%)/warn_unknown_var($1)/ge#
+    # Lookup variable
+    q#s/%([A-Z]+)%/getTwikiVar($1)/ge#
     
     );
+
+for my $twikiVarFile (@varFiles) {
+    unless (-e $twikiVarFile) {
+	warn "Can't find $twikiVarFile\n";
+	next;
+    }
+    warn "Reading variable definitions from $twikiVarFile\n" if $verbose;
+
+    open(TWIKI,"<$twikiVarFile") or die("unable to open $twikiVarFile - $!");
+    while (<TWIKI>) {
+	if (/\* +Set +([A-Za-z]+) += +(.*)/) {
+	    setTwikiVar($1,$2);
+	}
+    }
+    close(TWIKI);
+}
+my %twikiVarBase = %twikiVar;
 
 for my $twikiFile (@twikiFiles) {
     unless (-e $twikiFile) {
@@ -220,6 +244,7 @@ for my $twikiFile (@twikiFiles) {
     $author = $date = undef;
     @attachments = ();
     $topic = $stub;
+    %twikiVar = %twikiVarBase;
     
     # Open file
     open(TWIKI,"<$twikiFile") or die("unable to open $twikiFile - $!"); 
@@ -384,12 +409,23 @@ sub run_maintenance_script {
     }
 }
 
-sub warn_unknown_var {
+sub setTwikiVar {
+    my ($var, $def) = @_;
+    $twikiVar{$var} = $def;
+    warn "Set $var = $def\n" if $verbose;
+    return "";
+}
+
+sub getTwikiVar {
     my ($var) = @_;
-    unless ($warned_unknown{$var}++) {
-	warn "Unknown variable: $var\n";
+    if (exists $twikiVar{$var}) {
+	return $twikiVar{$var};
+    } else {
+	unless ($warned{$var}++) {
+	    warn "Unknown variable: $var\n";
+	}
     }
-    return $var;
+    return "";
 }
 
 sub print_mediawiki {
