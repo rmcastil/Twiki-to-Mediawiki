@@ -259,7 +259,7 @@ sub _translateText {
 
 sub makeLink {
     my ($link, $text) = @_;
-    return ($link eq $text) ? "[[<nop>$link]]" : "[[<nop>$link|<nop>$text]]";
+    return ($link eq $text) ? "[<nop>$link]" : "[<nop>$link|<nop>$text]";
 }
 
 sub makeWikiWord {
