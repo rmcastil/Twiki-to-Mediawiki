@@ -259,7 +259,7 @@ sub _translateText {
 
 sub makeLink {
     my ($link, $text) = @_;
-    return $link =~ /^http/ ? makeInternalLink($link,$text) : makeExternalLink($link,$text);
+    return $link =~ /^http/ ? makeExternalLink($link,$text) : makeInternalLink($link,$text);
 }
 
 sub makeInternalLink {
