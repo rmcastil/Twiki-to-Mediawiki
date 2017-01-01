@@ -41,10 +41,6 @@ class AddInterwiki extends LoggedUpdateMaintenance {
 		return __CLASS__;
 	}
 
-	protected function updateSkippedMessage() {
-		return 'RFC and PMID already added to interwiki database table';
-	}
-
 	protected function doDBUpdates() {
 		$interwikiCache = $this->getConfig()->get( 'InterwikiCache' );
 		// Using something other than the database,
