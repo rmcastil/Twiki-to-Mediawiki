@@ -47,6 +47,7 @@ my ($verbose,
     $wwwUser,
     $uploadAttachments,
     $deleteAttachments,
+    $addInterwikis,
     $dryRun);
 
 # Mediawiki globals & options
@@ -56,6 +57,8 @@ my $importScript = "importTextFiles.php";
 my $uploadScript = "importImages.php";
 my $moveScript = "moveBatch.php";
 my $deleteScript = "deleteBatch.php";
+
+my $interwikiScript = "addInterwiki.php";
 
 # TWiki globals
 my $web = "Main";
@@ -77,15 +80,16 @@ my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
     . " -keep           Keep MediaWiki file after import\n"
     . " -user <name>    Username for import (overrides TWiki author)\n"
     . " -summary <desc> Summary of edit (default '$summary')\n"
-    . " -mw <dir>       Location of MediaWiki\n"
     . " -unattach       Delete attachments with $deleteScript\n"
     . " -attach         Upload attachments with $uploadScript\n"
     . " -replace        Shorthand for '-delete -import -rename'\n"
     . " -reattach       Shorthand for '-unattach -attach'\n"
     . " -renew          Shorthand for '-replace -reattach'\n"
-    . " -wwwuser <user> httpd user (e.g. apache, www-data)\n"
+    . " -interwiki      Add InterWiki links using $interwikiScript\n"
+    . " -mw <dir>       Location of MediaWiki root directory\n"
+    . " -wwwuser <user> Username for httpd (e.g. apache, www-data)\n"
     . " -dryrun         Don't run MediaWiki scripts or save files\n"
-    . " -verbose        Print more stuff\n"
+    . " -verbose        Print reams of stuff\n"
     ;
 
 GetOptions ("data=s" => \$dataDir,
@@ -105,6 +109,7 @@ GetOptions ("data=s" => \$dataDir,
 	    "replace" => sub { $deletePages = $importPages = $renamePages = 1},
 	    "reattach" => sub { $deleteAttachments = $uploadAttachments = 1},
 	    "renew" => sub { $deletePages = $importPages = $renamePages = $deleteAttachments = $uploadAttachments = 1},
+	    "interwiki" => \$addInterwikis,
 	    "wwwuser=s" => \$wwwUser,
 	    "dryrun" => \$dryRun,
 	    "verbose" => \$verbose)
@@ -115,47 +120,11 @@ my $noFile = ($useStdout && !$importPages) || ($dryRun && !$keepPageFiles);
 $outDir = "." if !defined($outDir) && !$importPages && !$dryRun && !$useStdout;
 
 my $usingScripts = $deletePages || $importPages || $renamePages || $deleteAttachments || $uploadAttachments;
-if ($usingScripts) {
-    if (!defined $mwDir) {
-	# Try to guess DocumentRoot
-	my $docRoot;
-	warn "Looking for httpd.conf...\n";
-	my $httpdConf = grepFirst (sub {-e shift}, qw(/etc/httpd/conf/httpd.conf))
-	    || findFirst ("/etc", "httpd.conf")
-	    || findFirst ("/usr/local/etc", "httpd.conf");
-	if (-e $httpdConf) {
-	    open CONF, "<$httpdConf";
-	    while (<CONF>) {
-		if (/^\s*DocumentRoot\s+"([^"]+)"/) {
-		    $docRoot = $1;
-		    last;
-		}
-	    }
-	    close CONF;
-	}
-	if (!defined $docRoot) {
-	    $docRoot = grepFirst (sub {-d shift}, qw(/var/www/html /Library/WebServer/Documents)) || '/';
-	    warn "Can't find httpd.conf, looking for MediaWiki in $docRoot...\n";
-	}
-	warn "DocumentRoot is $docRoot, looking for MediaWiki...\n";
-	# Try to guess location of MediaWiki
-	my $localSettings = findFirst ($docRoot, "LocalSettings.php");
-	if ($localSettings) {
-	    my $dir = dirname($localSettings);
-	    if (-d "$dir/maintenance") {
-		$mwDir = $dir;
-		warn "Guessing MediaWiki is in $mwDir; use -mwdir to override this\n";
-	    }
-	}
-	if (!defined $mwDir) {
-	    $mwDir = '/mediawiki';
-	    warn "Can't find MediaWiki, defaulting to $mwDir. Use -mwdir to specify\n";
-	}
-    }
-}
+$mwDir = guessMwDir() if $usingScripts && !defined($mwDir);
 
 # Build list of files
 my @twikiFiles;
+if (@ARGV == 1 && -d $ARGV[0]) { $dataDir = shift }
 if ($dataDir) {
     opendir DIR, $dataDir or die "Couldn't open $dataDir: $!";
     @twikiFiles = map ("$dataDir/$_", grep (/\.txt$/, sort {$a cmp $b} readdir(DIR)));
@@ -548,9 +517,20 @@ if ($uploadAttachments && @attachments) {
     }
 }
 
-# Show location of page files
-if ($keepPageFiles && !$outDir) {
-    warn "Page files are in $mwOutDir\n";
+# Add InterWiki links
+if ($addInterwikis) {
+    my $maintDir = "$mwDir/maintenance";
+    my $repoDir = dirname(abs_path($0));
+    sysOrSudo("cp $repoDir/$interwikiScript $maintDir") unless -e "$maintDir/$interwikiScript";
+    my $interwikiFile = getInterwikiFile();
+    open INTERWIKI, "<$interwikiFile";
+    while (<INTERWIKI>) {
+	if (/^\|\s*([A-Z][A-Za-z0-9]+)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|.*$/) {
+	    my ($prefix, $url, $tooltip) = ($1, $2, $3);
+	    $url =~ s/\$page/\$1/g;
+	    runMaintenanceScript ("$interwikiScript $prefix $url");
+	}
+    }
 }
 
 # Attempt to trigger a cache purge by touching LocalSettings.php
@@ -558,7 +538,12 @@ if ($keepPageFiles && !$outDir) {
 #    $wgInvalidateCacheOnLocalSettingsChange = true;
 if ($usingScripts) {
     my $localSettings = "$mwDir/LocalSettings.php";
-    sudoAsWeb ("touch $localSettings") if -e $localSettings;
+    sysOrSudo("touch $localSettings") if -e $localSettings;
+}
+
+# Finally: show location of page files
+if ($keepPageFiles && !$outDir) {
+    warn "Page files are in $mwOutDir\n";
 }
 
 # ================================================================ 
@@ -578,7 +563,7 @@ sub makeLink {
     my ($link, $text) = @_;
     my $isAnchor = ($link =~ /^#/);
     my $isInternal = ($link =~ /^[A-Za-z0-9\.]+$/);
-    my $isInterwiki = ($link =~ /([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*?))/);
+    my $isInterwiki = ($link =~ /(?<=[\s\(])([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*))/);
     return ($isAnchor || $isInternal || $isInterwiki) ? makeInternalLink($link,$text) : makeExternalLink($link,$text);
 }
 
@@ -660,9 +645,15 @@ sub sudoAsWeb {
     my $cmd = $sudo . $command;
     warn "$cmd\n";
     unless ($dryRun) {
-	my $cd = defined($dir) ? "cd $mwDir/maintenance; " : "";
+	my $cd = defined($dir) ? "cd $dir; " : "";
 	system $cd . $cmd;
     }
+}
+
+sub sysOrSudo {
+    my ($command) = @_;
+    if (!$dryRun && system("$command 2>/dev/null")) { sudoAsWeb($command) }
+    else { warn "$command\n" }
 }
 
 sub setTwikiVar {
@@ -717,6 +708,19 @@ sub getTwikiPrefsFiles {
 		"$dir/WebPreferences.txt");
 }
 
+sub getInterwikiFile {
+    my ($dir) = @_;
+    if ($dataDir) { return abs_path("$dataDir/../TWiki/InterWikis.txt") }
+    else {
+	for my $twikiFile (@twikiFiles) {
+	    my $path = abs_path (dirname($twikiFile) . "/../TWiki/InterWikis.txt");
+	    return $path if -e $path;
+	}
+    }
+    warn "Couldn't find TWiki.InterWikis!\n";
+    return undef;
+}
+
 sub getStub {
     my ($twikiFile) = @_;
     my $stub = basename($twikiFile);
@@ -752,6 +756,45 @@ sub deletePages {
 sub makeAttachmentFilename {
     my ($attachTopic, $attachName) = @_;
     return "$attachTopic.$attachName";
+}
+
+sub guessMwDir {
+    my $mw;
+    # Try to guess DocumentRoot
+    my $docRoot;
+    warn "Looking for httpd.conf...\n";
+    my $httpdConf = grepFirst (sub {-e shift}, qw(/etc/httpd/conf/httpd.conf))
+	|| findFirst ("/etc", "httpd.conf")
+	|| findFirst ("/usr/local/etc", "httpd.conf");
+    if (-e $httpdConf) {
+	open CONF, "<$httpdConf";
+	while (<CONF>) {
+	    if (/^\s*DocumentRoot\s+"([^"]+)"/) {
+		$docRoot = $1;
+		last;
+	    }
+	}
+	close CONF;
+    }
+    if (!defined $docRoot) {
+	$docRoot = grepFirst (sub {-d shift}, qw(/var/www/html /Library/WebServer/Documents)) || '/';
+	warn "Can't find httpd.conf, looking for MediaWiki in $docRoot...\n";
+    }
+    warn "DocumentRoot is $docRoot, looking for MediaWiki...\n";
+    # Try to guess location of MediaWiki
+    my $localSettings = findFirst ($docRoot, "LocalSettings.php");
+    if ($localSettings) {
+	my $dir = dirname($localSettings);
+	if (-d "$dir/maintenance") {
+	    $mw = $dir;
+	    warn "Guessing MediaWiki is in $mw; use -mwdir to override this\n";
+	}
+    }
+    if (!defined $mw) {
+	$mw = '/mediawiki';
+	warn "Can't find MediaWiki, defaulting to $mw. Use -mwdir to specify\n";
+    }
+    return $mw;
 }
 
 sub grepFirst {
