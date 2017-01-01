@@ -528,7 +528,7 @@ if ($addInterwikis) {
 	if (/^\|\s*([A-Z][A-Za-z0-9]+)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|.*$/) {
 	    my ($prefix, $url, $tooltip) = ($1, $2, $3);
 	    $url =~ s/\$page/\$1/g;
-	    runMaintenanceScript ("$interwikiScript --overwrite $prefix $url");
+	    runMaintenanceScript ("$interwikiScript --overwrite $prefix " . $url);
 	}
     }
 }
@@ -631,7 +631,7 @@ sub runMaintenanceScript {
     unless ($dryRun) {
 	system "chmod -R a+r $target" if length $target;
     }
-    sudoAsWeb ("$php $script $target", "$mwDir/maintenance");
+    sudoAsWeb (join (" ", $php, $script, $target), "$mwDir/maintenance");
 }
 
 sub sudoAsWeb {
