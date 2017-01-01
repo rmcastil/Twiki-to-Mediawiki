@@ -122,7 +122,7 @@ if ($dataDir) {
 # 
 # *Quoting with a percent ("%") or hash ("#") sign. 
 #
-my ($topic, $author, $date, @attachments, @linkedAttachments, %twikiVar, %warned, $currentText);  # global variables used by parser
+my ($topic, $author, $date, @attachments, @linkedAttachments, %twikiVar, %warned, $currentText, %pageNonempty);  # global variables used by parser
 my @rules= ( 
 
     # Remove variable-setting lines (they will already have been parsed)
@@ -402,6 +402,8 @@ for my $twikiFile (@twikiFiles) {
 	}
     }
 
+    $pageNonempty{$stub} = grep /\S/, @output;
+    
     # Change file timestamp
     my $use_timestamp = "";
     if ($date) {
@@ -410,7 +412,7 @@ for my $twikiFile (@twikiFiles) {
     }
 
     # Do Mediawiki import
-    if ($importPages) {
+    if ($importPages && $pageNonempty{$stub}) {
 	my $mwUser = ($user or $author or "");
 	run_maintenance_script ("$importScript --bot --overwrite --user='$mwUser' --summary='$summary' $use_timestamp", $mediawikiFile);
 	unlink($mediawikiFile) unless $keepPageFiles;
@@ -419,11 +421,19 @@ for my $twikiFile (@twikiFiles) {
 
 # Rename
 if ($renamePages) {
-    my $tmp = createWorldReadableTempFile();
-    print $tmp map (spaceWikiWord($_) eq $_ ? () : ($_."|".spaceWikiWord($_)."\n"), map (getStub($_), @twikiFiles));
-    close $tmp;
-    my $tmpFilename = $tmp->filename;
-    run_maintenance_script ("$moveScript --r='Rename from TWiki to MediaWiki style'", $tmpFilename);
+    my @rename = map (spaceWikiWord($_) eq $_ ? () : ($_."|".spaceWikiWord($_)."\n"),
+		      grep ($pageNonempty{$_},
+			    map (getStub($_),
+				 @twikiFiles)));
+    if (@rename) {
+	my $tmp = createWorldReadableTempFile();
+	print $tmp @rename;
+	close $tmp;
+	my $tmpFilename = $tmp->filename;
+	run_maintenance_script ("$moveScript --r='Rename from TWiki to MediaWiki style'", $tmpFilename);
+    } else {
+	warn "No pages to rename\n";
+    }
 }
 
 # Upload
