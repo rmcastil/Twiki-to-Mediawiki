@@ -8,6 +8,7 @@ Run `twiki2mediawiki.pl` to convert a TWiki web to MediaWiki.
     - Optionally delete pages from database (e.g. to undo previous import) using [deleteBatch.php](https://www.mediawiki.org/wiki/Manual:DeleteBatch.php)
     - Optionally rename to Mediawiki-style links using [moveBatch.php](https://www.mediawiki.org/wiki/Manual:MoveBatch.php)
 - Optionally import attachments using [importImages.php](https://www.mediawiki.org/wiki/Manual:ImportImages.php)
+    - Optionally delete them first using [deleteBatch.php](https://www.mediawiki.org/wiki/Manual:DeleteBatch.php)
     - Attachments from other pages & webs are automatically included
 - Preserves timestamps (but not revision history) and usernames (but doesn't create users)
 - Converts most formatting including lists & tables
