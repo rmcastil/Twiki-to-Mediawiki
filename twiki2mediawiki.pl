@@ -112,6 +112,7 @@ GetOptions ("data=s" => \$dataDir,
 die $usage unless @ARGV or $dataDir;
 
 my $no_file = ($useStdout && !$importPages) || ($dryRun && !$keepPageFiles);
+$outDir = "." if !defined($outDir) && !$importPages && !$dryRun && !$useStdout;
 
 # Build list of files
 my @twikiFiles;
