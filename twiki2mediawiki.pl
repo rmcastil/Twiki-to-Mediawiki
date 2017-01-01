@@ -535,7 +535,9 @@ sub addAttachment {
     if ($uploadAttachments) {
 	my %info = ('web' => $web, 'topic' => $topic);
 	while ($info =~ /([a-z]+)="(.*?)"/g) { $info{$1} = $2 }
-	push @attachments, \%info;
+	unless ($info->{name} =~ /^(graph|latex)[a-f0-9]{32}.png$/) {  # skip attachments that look like they were made by MathModePlugin or DirectedGraphPlugin
+	    push @attachments, \%info;
+	}
     }
     return "";
 }
