@@ -38,6 +38,7 @@ my ($verbose,
     $pubDir,
     $useStdout,
     @varFiles,
+    $mwDir,
     $deletePages,
     $importPages,
     $renamePages,
@@ -49,8 +50,6 @@ my ($verbose,
     $dryRun);
 
 # Mediawiki globals & options
-my $mwDir = "/var/www/wiki";
-my $php = "php";
 my $summary = "Imported from TWiki";
 
 my $importScript = "importTextFiles.php";
@@ -62,6 +61,7 @@ my $deleteScript = "deleteBatch.php";
 my $web = "Main";
 
 # Other globals
+my $php = "php";
 my $tmpRootDir = "/tmp";
 
 # Parse command line
@@ -77,7 +77,7 @@ my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
     . " -keep           Keep MediaWiki file after import\n"
     . " -user <name>    Username for import (overrides TWiki author)\n"
     . " -summary <desc> Summary of edit (default '$summary')\n"
-    . " -mw <dir>       Location of MediaWiki (default '$mwDir')\n"
+    . " -mw <dir>       Location of MediaWiki\n"
     . " -unattach       Delete attachments with $deleteScript\n"
     . " -attach         Upload attachments with $uploadScript\n"
     . " -replace        Shorthand for '-delete -import -rename'\n"
@@ -113,6 +113,46 @@ die $usage unless @ARGV or $dataDir;
 
 my $noFile = ($useStdout && !$importPages) || ($dryRun && !$keepPageFiles);
 $outDir = "." if !defined($outDir) && !$importPages && !$dryRun && !$useStdout;
+
+my $usingScripts = $deletePages || $importPages || $renamePages || $deleteAttachments || $uploadAttachments;
+if ($usingScripts) {
+    if (!defined $mwDir) {
+	# Try to guess DocumentRoot
+	my $docRoot;
+	warn "Looking for httpd.conf...\n";
+	my $httpdConf = grepFirst (sub {-e shift}, qw(/etc/httpd/conf/httpd.conf))
+	    || findFirst ("/etc", "httpd.conf")
+	    || findFirst ("/usr/local/etc", "httpd.conf");
+	if (-e $httpdConf) {
+	    open CONF, "<$httpdConf";
+	    while (<CONF>) {
+		if (/^\s*DocumentRoot\s+"([^"]+)"/) {
+		    $docRoot = $1;
+		    last;
+		}
+	    }
+	    close CONF;
+	}
+	if (!defined $docRoot) {
+	    $docRoot = grepFirst (sub {-d shift}, qw(/var/www/html /Library/WebServer/Documents)) || '/';
+	    warn "Can't find httpd.conf, looking for MediaWiki in $docRoot...\n";
+	}
+	warn "DocumentRoot is $docRoot, looking for MediaWiki...\n";
+	# Try to guess location of MediaWiki
+	my $localSettings = findFirst ($docRoot, "LocalSettings.php");
+	if ($localSettings) {
+	    my $dir = dirname($localSettings);
+	    if (-d "$dir/maintenance") {
+		$mwDir = $dir;
+		warn "Guessing MediaWiki is in $mwDir; use -mwdir to override this\n";
+	    }
+	}
+	if (!defined $mwDir) {
+	    $mwDir = '/mediawiki';
+	    warn "Can't find MediaWiki, defaulting to $mwDir. Use -mwdir to specify\n";
+	}
+    }
+}
 
 # Build list of files
 my @twikiFiles;
@@ -516,7 +556,7 @@ if ($keepPageFiles && !$outDir) {
 # Attempt to trigger a cache purge by touching LocalSettings.php
 # Requires the following line in LocalSettings.php:
 #    $wgInvalidateCacheOnLocalSettingsChange = true;
-if ($deletePages || $importPages || $renamePages || $deleteAttachments || $uploadAttachments) {
+if ($usingScripts) {
     my $localSettings = "$mwDir/LocalSettings.php";
     sudoAsWeb ("touch $localSettings") if -e $localSettings;
 }
@@ -712,6 +752,26 @@ sub deletePages {
 sub makeAttachmentFilename {
     my ($attachTopic, $attachName) = @_;
     return "$attachTopic.$attachName";
+}
+
+sub grepFirst {
+    my ($test, @list) = @_;
+    for my $x (@list) {
+	return $x if &$test($x);
+    }
+    return undef;
+}
+
+sub findFirst {
+    my ($root, $name) = @_;
+    return undef unless -d $root;
+    warn "Looking for $name in $root\n" if $verbose;
+    my $file = `find -L $root -name $name -print -quit`;
+    if (length $file) {
+	chomp $file;
+	return $file;
+    }
+    return undef;
 }
 
 1;
