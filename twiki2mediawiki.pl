@@ -141,22 +141,21 @@ my @rules= (
     q#s/%ICON{\"?(.+?)\"?}%/<img src="%ICONURLPATH{$1}%"\/>/g#,   # will get expanded again by %ICONURLPATH% rule
     q#s/%ICONURL{\"?(.+?)\"?}%/%ICONURLPATH{$1}%/g#,   # will get expanded again by %ICONURLPATH% rule
     q#s/%ICONURLPATH{\"?(.+?)\"?}%/%PUBURL%\/TWiki\/TWikiDocGraphics\/$1.gif/g#,   # will get expanded again by %PUBURL% rule
-    
+
     # ATTACHURL, PUBURL
     q#s/%ATTACHURL%\//attachmentLinkPrefix($web,$topic)/ge#,
     q#s/%ATTACHURLPATH%\//attachmentLinkPrefix($web,$topic)/ge#,
     q#s/%PUBURL%\/([^\/]+)\/([^\/]+)\/([^\"\s\]]+)/attachmentLink($1,$2,$3)/ge#,
     q#s/%PUBURLPATH%\/([^\/]+)\/([^\/]+)\/([^\"\s\]]+)/attachmentLink($1,$2,$3)/ge#,
-    
+
     # %DATE% and %DISPLAYTIME%
     q#s/%DATE%/{{CURRENTYEAR}}-{{CURRENTMONTH}}-{{CURRENTDAY}}/g#,
     q#s/%DISPLAYTIME%/{{CURRENTYEAR}}-{{CURRENTMONTH}}-{{CURRENTDAY}} {{CURRENTTIME}/g#,
-    
+
     # %META%
     q#s/^%META:TOPICINFO{author="(.*?)" date="(.*?)".*/setTopicInfo($1,$2)/ge#,  # %META:TOPICINFO
     q#s/^%META:FILEATTACHMENT{(.*)}%/addAttachment($1,$web,$topic)/ge#,  # %META:FILEATTACHMENT
-    q#s/^%META:FILEATTACHMENT{(.*)}%/"FECK$1"/ge#,  # %META:FILEATTACHMENT
-    q#s/^%META.*//g#, # Remove remaining meta tags 
+    q#s/^%META.*//g#, # Remove remaining meta tags
 
     # %INCLUDE%
     q#s/%INCLUDE\{"?$web\.(.*?)"?\}%/{{:<nop>$1}}/g#, # %INCLUDE{$web.XXX}% --> {{XXX}}
@@ -192,6 +191,7 @@ my @rules= (
     q%s/\[\[(ftp\:.*?)\]\[(.*?)\]\]/makeLink($1,$2)/ge%, # external link [[ftp:...][label]] 
     q%s/\[\[([^\]]*)\]\]/makeLink(makeWikiWord($1),$1)/ge%, # [[link]] -> link
     q%s/\[\[([^\]]*)\]\[(.*?)\]\]/makeLink($1,$2)/ge%, # [[link][text]] -> link
+    q%s/<a.*?href="(.*?)".*?>\s*(.*?)\s*<\/a>/makeLink($1,$2)/ge%, # external link
 
     # 
     # Wiki Tags 
@@ -205,6 +205,11 @@ my @rules= (
     q#s/(?<![\!:])\b([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1,spaceWikiWord($1))/ge#, # WikiWord -> link
     q#s/!([A-Z]{1}\w+?[A-Z]{1})/$1/g#, # remove ! in front of Twiki words.
     q#s/<nop>//g#, # remove <nop>
+
+    # Images (attachments only) and links wrapped around images
+    q#s/<img .*?src="Media:(.+?)".*?\/>/[[File:$1]]/g#,  # inline images
+    q#s/\[\[\s*(.+?)\s*\|\s*\[\[File:(.*?)\]\]\s*\]\]/[[File:$2|link=$1]]/g#,  # external links around images
+    q#s/\[\s*(.+?)\s+\[\[File:(.*?)\]\]\s*\]/[[File:$2|link=$1]]/g#,  # internal links around images
 
     # 
     # Formatting 
