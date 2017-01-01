@@ -29,6 +29,7 @@ use File::Basename;
 use Cwd qw(abs_path);
 use File::Temp;
 use DateTime;
+use Encode;
 
 # Options that are disabled/empty by default
 my ($verbose,
@@ -351,7 +352,8 @@ for my $twikiFile (@twikiFiles) {
     # Initialize state
     my $convertingTable = 0;  # are we in the middle of a table conversion?
     while(<TWIKI>) { 
-	chomp; 
+	$_ = decode('Windows-1251', $_);
+	chomp;
 	# 
 	# Handle Table Endings 
 	# 
@@ -400,10 +402,11 @@ for my $twikiFile (@twikiFiles) {
 
     # print output
     if ($no_file) {
-	if ($useStdout) { print @output }
+	if ($useStdout) { binmode STDOUT, ":utf8"; print @output }
     } else {
 	unless ($dryRun && !$useStdout && !$keepPageFiles) {
 	    open(MEDIAWIKI,">$mediawikiFile") or die("unable to open $mediawikiFile - $!");
+	    binmode MEDIAWIKI, ":utf8";	
 	    print MEDIAWIKI @output;
 	    close(MEDIAWIKI) or die("unable to close $mediawikiFile - $!");
 	    if ($useStdout) { system "cat $mediawikiFile" }
