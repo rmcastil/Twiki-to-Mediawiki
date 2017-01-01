@@ -205,8 +205,8 @@ my @rules= (
     # Wiki Tags 
     # 
     q#s/<(\/?)verbatim>/<$1nowiki>/g#, # update verbatim tag. 
-    q#s/(?<[\s\(])([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*?))/makeLink("$1:$2")/ge#,  # InterWiki links
-    q#s/(?<[\s\(])([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*?))/<nop>$1:$2/g#,  # avoid linking remaining InterWiki links
+    q#s/(?<=[\s\(])([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*))/makeLink("$1:$2")/ge#,  # InterWiki links
+    q#s/(?<=[\s\(])([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*))/<nop>$1:$2/g#,  # avoid linking remaining InterWiki links
     q#s/$web\.([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1)/ge#, # $web.WikiWord -> link
     q#s/([A-Z][A-Za-z0-9]*)\.([A-Z][a-z]+[A-Z][A-Za-z]*)/<nop>$1.<nop>$2/g#, # OtherWebName.WikiWord -> <nop>OtherWebName.<nop>WikiWord
     q#s/<nop>([A-Z]{1}\w+?[A-Z]{1})/!$1/g#, # change <nop> to ! in front of Twiki words. 
