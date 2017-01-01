@@ -565,7 +565,7 @@ sub run_maintenance_script {
     unless (defined $wwwUser) {
 	$wwwUser = `ps -ef | egrep '(httpd|apache2|apache)' | grep -v \`whoami\` | grep -v root | head -n1 | awk '{print \$1}'`;
 	chomp $wwwUser;
-	warn "Guessing: -wwwuser $wwwUser" unless $wwwUser eq '0';
+	warn "Guessing: -wwwuser $wwwUser\n" unless $wwwUser eq '0';
     }
     my $sudo = $wwwUser eq '0' ? "" : "sudo -u $wwwUser ";
     my $cmd = "$sudo$php $script $target";
