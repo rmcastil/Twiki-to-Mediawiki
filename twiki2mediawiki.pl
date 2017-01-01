@@ -420,7 +420,7 @@ for my $twikiFile (@twikiFiles) {
 # Rename
 if ($renamePages) {
     my $tmp = createWorldReadableTempFile();
-    print $tmp map ($_."|".spaceWikiWord($_)."\n", map (getStub($_), @twikiFiles));
+    print $tmp map (spaceWikiWord($_) eq $_ ? () : ($_."|".spaceWikiWord($_)."\n"), map (getStub($_), @twikiFiles));
     close $tmp;
     my $tmpFilename = $tmp->filename;
     run_maintenance_script ("$moveScript --r='Rename from TWiki to MediaWiki style'", $tmpFilename);
