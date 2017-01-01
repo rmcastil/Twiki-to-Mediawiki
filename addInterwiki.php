@@ -56,13 +56,13 @@ class AddInterwiki extends Maintenance {
 		$oldUrl = $dbw->selectField(
 			'interwiki',
 			'iw_url',
-			[ 'iw_prefix' => 'rfc' ],
+			[ 'iw_prefix' => $prefix ],
 			__METHOD__
 		);
 
         $skip = false;
         if ($oldUrl !== false) {
-            $this->output("InterWiki prefix " . $prefix . " exists with URL " . $url . "\n");
+            $this->output("InterWiki prefix " . $prefix . " exists with URL " . $oldUrl . "\n");
             $skip = !$overwrite;
         }
 
