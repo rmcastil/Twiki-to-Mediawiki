@@ -366,14 +366,14 @@ for my $twikiFile (@twikiFiles) {
 	# * todo: Convert to multi-line regular expression 
 	# as table data doesn't get run through the list of rules currently 
 	# 
-	if (/\|/) { 	# Is this the first row of the table? If so, add header 
+	if (/^\s*\|.*\|\s*$/) { 	# Is this the first row of the table? If so, add header 
 	    if (!$convertingTable) { 
 		push @output, "{| border=\"1\"\n"; 
 		$convertingTable = 1; 
 	    } 		# start new row 
 	    push @output, "|-\n"; 
 	    my $arAnswer = $_; 
-	    $arAnswer =~ s/\|$//; 		#remove end pipe. 
+	    $arAnswer =~ s/\|\s*$//; 		#remove end pipe. 
 	    $arAnswer =~ s/(.)\|(.)/$1\|\|$2/g; 		#Change single pipe to double pipe. 
 	    my $text = _translateText($arAnswer); 
 	    push @output, "$text\n"; 
