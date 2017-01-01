@@ -415,7 +415,8 @@ for my $twikiFile (@twikiFiles) {
     # Do Mediawiki import
     if ($importPages && $pageNonempty{$stub}) {
 	my $mwUser = ($user or $author or "");
-	run_maintenance_script ("$importScript --bot --overwrite --user='$mwUser' --summary='$summary' $use_timestamp", $mediawikiFile);
+	my $userArg = length($mwUser) ? "--user='$mwUser'" : "";
+	run_maintenance_script ("$importScript --bot --overwrite $userArg --summary='$summary' $use_timestamp", $mediawikiFile);
 	unlink($mediawikiFile) unless $keepPageFiles;
     }
 }
