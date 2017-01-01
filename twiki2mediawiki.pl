@@ -111,7 +111,7 @@ GetOptions ("data=s" => \$dataDir,
   or die("Error in command line arguments\n" . $usage);
 die $usage unless @ARGV or $dataDir;
 
-my $no_file = ($useStdout && !$importPages) || ($dryRun && !$keepPageFiles);
+my $noFile = ($useStdout && !$importPages) || ($dryRun && !$keepPageFiles);
 $outDir = "." if !defined($outDir) && !$importPages && !$dryRun && !$useStdout;
 
 # Build list of files
@@ -402,7 +402,7 @@ for my $twikiFile (@twikiFiles) {
     elsif (!$gotStartInclude && $gotStopInclude) { unshift @output, "<onlyinclude>\n" }
 
     # print output
-    if ($no_file) {
+    if ($noFile) {
 	if ($useStdout) { binmode STDOUT, ":utf8"; print @output }
     } else {
 	unless ($dryRun && !$useStdout && !$keepPageFiles) {
@@ -417,17 +417,17 @@ for my $twikiFile (@twikiFiles) {
     $pageNonempty{$stub} = grep /\S/, @output;
     
     # Change file timestamp
-    my $use_timestamp = "";
+    my $useTimestamp = "";
     if ($date) {
 	utime ($date, $date, $mediawikiFile);
-	$use_timestamp = "--use-timestamp";
+	$useTimestamp = "--use-timestamp";
     }
 
     # Do Mediawiki import
     if ($importPages && $pageNonempty{$stub}) {
 	my $mwUser = ($user or $author or "");
 	my $userArg = length($mwUser) ? "--user='$mwUser'" : "";
-	run_maintenance_script ("$importScript --bot --overwrite $userArg --summary='$summary' $use_timestamp", $mediawikiFile);
+	runMaintenanceScript ("$importScript --bot --overwrite $userArg --summary='$summary' $useTimestamp", $mediawikiFile);
 	unlink($mediawikiFile) unless $keepPageFiles;
     }
 }
@@ -442,7 +442,7 @@ if ($renamePages) {
 	my $tmp = createWorldReadableTempFile();
 	print $tmp @rename;
 	close $tmp;
-	run_maintenance_script ("$moveScript --r='Rename from TWiki to MediaWiki style'", $tmp->filename);
+	runMaintenanceScript ("$moveScript --r='Rename from TWiki to MediaWiki style'", $tmp->filename);
     } else {
 	warn "No pages to rename\n";
     }
@@ -502,7 +502,7 @@ if ($uploadAttachments && @attachments) {
 		my $userArg = defined($mwUser) ? "--user='$mwUser'" : "";
 		my $commentArg = defined($comment) ? "--comment='$comment'" : "";
 		warn "Uploading $filename\n" if $verbose;
-		run_maintenance_script ("$uploadScript $extensions --overwrite $userArg $commentArg --summary='$summary' --timestamp=$mwDate", $tempdir);
+		runMaintenanceScript ("$uploadScript $extensions --overwrite $userArg $commentArg --summary='$summary' --timestamp=$mwDate", $tempdir);
 	    }
 	}
     }
@@ -511,6 +511,14 @@ if ($uploadAttachments && @attachments) {
 # Show location of page files
 if ($keepPageFiles && !$outDir) {
     warn "Page files are in $mwOutDir\n";
+}
+
+# Attempt to trigger a cache purge by touching LocalSettings.php
+# Requires the following line in LocalSettings.php:
+#    $wgInvalidateCacheOnLocalSettingsChange = true;
+if ($deletePages || $importPages || $renamePages || $deleteAttachments || $uploadAttachments) {
+    my $localSettings = "$mwDir/LocalSettings.php";
+    sudoAsWeb ("touch $localSettings") if -e $localSettings;
 }
 
 # ================================================================ 
@@ -592,20 +600,28 @@ sub attachmentLinkPrefix {
     return "Media:$topic.";
 }
 
-sub run_maintenance_script {
+sub runMaintenanceScript {
     my ($script, $target) = @_;
     $target = "" unless $target;
+    unless ($dryRun) {
+	system "chmod -R a+r $target" if length $target;
+    }
+    sudoAsWeb ("$php $script $target", "$mwDir/maintenance");
+}
+
+sub sudoAsWeb {
+    my ($command, $dir) = @_;
     unless (defined $wwwUser) {
 	$wwwUser = `ps -ef | egrep '(httpd|apache2|apache)' | grep -v \`whoami\` | grep -v root | head -n1 | awk '{print \$1}'`;
 	chomp $wwwUser;
 	warn "Guessing: -wwwuser $wwwUser\n" unless $wwwUser eq '0';
     }
     my $sudo = $wwwUser eq '0' ? "" : "sudo -u $wwwUser ";
-    my $cmd = "$sudo$php $script $target";
+    my $cmd = $sudo . $command;
     warn "$cmd\n";
     unless ($dryRun) {
-	system "chmod -R a+r $target" if length $target;
-	system "cd $mwDir/maintenance; $cmd";
+	my $cd = defined($dir) ? "cd $mwDir/maintenance; " : "";
+	system $cd . $cmd;
     }
 }
 
@@ -690,7 +706,7 @@ sub deletePages {
     my $tmp = createWorldReadableTempFile();
     print $tmp map ("$_\n", @pages);
     close $tmp;
-    run_maintenance_script ($deleteScript, $tmp->filename);
+    runMaintenanceScript ($deleteScript, $tmp->filename);
 }
 
 sub makeAttachmentFilename {
