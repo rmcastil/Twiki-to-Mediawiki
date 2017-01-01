@@ -168,7 +168,8 @@ my @rules= (
 
     # %REDIRECT%
     q@s/%REDIRECT{"$web.(\S+?)"}%.*/"#REDIRECT ".makeInternalLink($1)/e@,
-    q@s/%REDIRECT.*//@,
+    q@s/%REDIRECT{"?(\S+?)"?}%.*/"#REDIRECT ".makeInternalLink($1)/e@,
+    q@s/%REDIRECT.*?%//@,
 
     # Remove some tags with quirky patterns
     q#s/%A_\w+%//g#,
