@@ -524,6 +524,7 @@ sub makeLink {
 
 sub makeInternalLink {
     my ($link, $text) = @_;
+    $link =~ s/^$web\.//;
     if ($renamePages) { $link = spaceWikiWord($link) }
     $text = $text || $link;
     return ($link eq $text) ? "[[<nop>$link]]" : "[[<nop>$link|<nop>$text]]";
