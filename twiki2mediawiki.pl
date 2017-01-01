@@ -119,7 +119,7 @@ die $usage unless @ARGV or $dataDir;
 my $noFile = ($useStdout && !$importPages) || ($dryRun && !$keepPageFiles);
 $outDir = "." if !defined($outDir) && !$importPages && !$dryRun && !$useStdout;
 
-my $usingScripts = $deletePages || $importPages || $renamePages || $deleteAttachments || $uploadAttachments;
+my $usingScripts = $deletePages || $importPages || $renamePages || $deleteAttachments || $uploadAttachments || $addInterwikis;
 $mwDir = guessMwDir() if $usingScripts && !defined($mwDir);
 
 # Build list of files
