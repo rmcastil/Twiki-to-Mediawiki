@@ -295,7 +295,8 @@ if ($deletePages) {
     }
     close $tmp;
     my $tmpFilename = $tmp->filename;
-	run_maintenance_script ("$deleteScript $tmpFilename");
+    system("chmod a+r $tmpFilename");
+    run_maintenance_script ("$deleteScript $tmpFilename");
 }
 
 # Create temp dir for pages, if appropriate
@@ -404,6 +405,7 @@ for my $twikiFile (@twikiFiles) {
     # Do Mediawiki import
     if ($importPages) {
 	my $mwUser = ($user or $author or "");
+	system "chmod a+r $mediawikiFile";
 	run_maintenance_script ("$importScript --bot --overwrite --user='$mwUser' --summary='$summary' $use_timestamp $mediawikiFile");
 	unlink($mediawikiFile) unless $keepPageFiles;
     }
@@ -415,6 +417,7 @@ if ($renamePages) {
     print $tmp map ($_."|".spaceWikiWord($_)."\n", map (getStub($_), @twikiFiles));
     close $tmp;
     my $tmpFilename = $tmp->filename;
+    system "chmod a+r $tmpFilename";
     run_maintenance_script ("$moveScript --r='Rename from TWiki to MediaWiki style' $tmpFilename");
 }
 
@@ -466,6 +469,7 @@ if ($uploadAttachments && (@attachments || @linkedAttachments)) {
 		my $userArg = defined($mwUser) ? "--user='$mwUser'" : "";
 		my $commentArg = defined($comment) ? "--comment='$comment'" : "";
 		warn "Uploading $filename\n" if $verbose;
+		system "chmod -R a+r $tempdir";
 		run_maintenance_script ("$uploadScript $extensions --overwrite $userArg $commentArg --summary='$summary' --timestamp=$mwDate $tempdir");
 	    }
 	}
