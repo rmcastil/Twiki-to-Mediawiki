@@ -77,6 +77,7 @@ my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
     . " -summary <desc> Summary of edit (default '$summary')\n"
     . " -mw <dir>       Location of MediaWiki (default '$mwDir')\n"
     . " -upload         Run MediaWiki $uploadScript script\n"
+    . " -update         Shorthand for '-delete -import -rename -upload'\n"
     . " -wwwuser <user> httpd user (e.g. apache, www-data)\n"
     . " -dryrun         Don't run MediaWiki scripts or save files\n"
     . " -verbose        Print more stuff\n"
@@ -95,6 +96,7 @@ GetOptions ("data=s" => \$dataDir,
 	    "summary=s" => \$summary,
 	    "mw=s" => \$mwDir,
 	    "upload" => \$uploadAttachments,
+	    "update" => sub { $deletePages = $importPages = $renamePages = $uploadAttachments = 1},
 	    "wwwuser=s" => \$wwwUser,
 	    "dryrun" => \$dryRun,
 	    "verbose" => \$verbose)
