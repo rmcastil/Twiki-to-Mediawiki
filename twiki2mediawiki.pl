@@ -295,8 +295,7 @@ if ($deletePages) {
     }
     close $tmp;
     my $tmpFilename = $tmp->filename;
-    system("chmod a+r $tmpFilename");
-    run_maintenance_script ("$deleteScript $tmpFilename");
+    run_maintenance_script ($deleteScript, $tmpFilename);
 }
 
 # Create temp dir for pages, if appropriate
@@ -405,8 +404,7 @@ for my $twikiFile (@twikiFiles) {
     # Do Mediawiki import
     if ($importPages) {
 	my $mwUser = ($user or $author or "");
-	system "chmod a+r $mediawikiFile";
-	run_maintenance_script ("$importScript --bot --overwrite --user='$mwUser' --summary='$summary' $use_timestamp $mediawikiFile");
+	run_maintenance_script ("$importScript --bot --overwrite --user='$mwUser' --summary='$summary' $use_timestamp", $mediawikiFile);
 	unlink($mediawikiFile) unless $keepPageFiles;
     }
 }
@@ -417,8 +415,7 @@ if ($renamePages) {
     print $tmp map ($_."|".spaceWikiWord($_)."\n", map (getStub($_), @twikiFiles));
     close $tmp;
     my $tmpFilename = $tmp->filename;
-    system "chmod a+r $tmpFilename";
-    run_maintenance_script ("$moveScript --r='Rename from TWiki to MediaWiki style' $tmpFilename");
+    run_maintenance_script ("$moveScript --r='Rename from TWiki to MediaWiki style'", $tmpFilename);
 }
 
 # Upload
@@ -469,8 +466,7 @@ if ($uploadAttachments && (@attachments || @linkedAttachments)) {
 		my $userArg = defined($mwUser) ? "--user='$mwUser'" : "";
 		my $commentArg = defined($comment) ? "--comment='$comment'" : "";
 		warn "Uploading $filename\n" if $verbose;
-		system "chmod -R a+r $tempdir";
-		run_maintenance_script ("$uploadScript $extensions --overwrite $userArg $commentArg --summary='$summary' --timestamp=$mwDate $tempdir");
+		run_maintenance_script ("$uploadScript $extensions --overwrite $userArg $commentArg --summary='$summary' --timestamp=$mwDate", $tempdir);
 	    }
 	}
     }
@@ -562,16 +558,17 @@ sub attachmentLinkPrefix {
 }
 
 sub run_maintenance_script {
-    my ($script) = @_;
+    my ($script, $target) = @_;
     unless (defined $wwwUser) {
 	$wwwUser = `ps -ef | egrep '(httpd|apache2|apache)' | grep -v \`whoami\` | grep -v root | head -n1 | awk '{print \$1}'`;
 	chomp $wwwUser;
 	warn "Guessing: -wwwuser $wwwUser" unless $wwwUser eq '0';
     }
     my $sudo = $wwwUser eq '0' ? "" : "sudo -u $wwwUser ";
-    my $cmd = "$sudo$php $script";
+    my $cmd = "$sudo$php $script $target";
     warn "$cmd\n";
     unless ($dryRun) {
+	system "chmod -R a+r $target";
 	system "cd $mwDir/maintenance; $cmd";
     }
 }
