@@ -283,13 +283,14 @@ my %twikiVarBase = %twikiVar;
 
 my @found;
 for my $twikiFile (@twikiFiles) {
-    if ($ignorePage{getStub($twikiFile)}) {
+    unless ($twikiFile =~ /\.txt$/) {
+	warn "Ignoring non-TWiki file $twikiFile\n";
+    } elsif ($ignorePage{getStub($twikiFile)}) {
 	warn "Ignoring TWiki page $twikiFile\n" if $verbose;
     } elsif (-e $twikiFile) {
 	push @found, $twikiFile;
     } else {
 	warn "Can't find $twikiFile\n";
-	next;
     }
 }
 @twikiFiles = @found;
