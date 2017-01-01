@@ -218,7 +218,7 @@ my @rules= (
     q#s/$web\.([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1)/ge#, # $web.WikiWord -> link
     q#s/([A-Z][A-Za-z0-9]*)\.([A-Z][a-z]+[A-Z][A-Za-z]*)/<nop>$1.<nop>$2/g#, # OtherWebName.WikiWord -> <nop>OtherWebName.<nop>WikiWord
     q#s/<nop>([A-Z]{1}\w+?[A-Z]{1})/!$1/g#, # change <nop> to ! in front of Twiki words. 
-    q#s/(?<![\!:])\b([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1,spaceWikiWord($1))/ge#, # WikiWord -> link
+    q@s/(?<![\!:#])\b([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1,spaceWikiWord($1))/ge@, # WikiWord -> link
     q#s/!([A-Z]{1}\w+?[A-Z]{1})/$1/g#, # remove ! in front of Twiki words.
     q#s/<nop>//g#, # remove <nop>
 
