@@ -149,8 +149,9 @@ my @rules= (
     # %META%
     q#s/^%META:TOPICINFO{author="(.*?)" date="(.*?)".*/setTopicInfo($1,$2)/ge#,  # %META:TOPICINFO
     q#s/^%META:FILEATTACHMENT{(.*)}%/addAttachment($1,$web,$topic)/ge#,  # %META:FILEATTACHMENT
+    q#s/^%META:FILEATTACHMENT{(.*)}%/"FECK$1"/ge#,  # %META:FILEATTACHMENT
     q#s/^%META.*//g#, # Remove remaining meta tags 
-    
+
     # %INCLUDE%
     q#s/%INCLUDE\{"?$web\.(.*?)"?\}%/{{:<nop>$1}}/g#, # %INCLUDE{$web.XXX}% --> {{XXX}}
     q#s/%INCLUDE\{"?(.*?)"?\}%/{{:<nop>$1}}/g#, # %INCLUDE{XXX}% --> {{XXX}}
@@ -380,12 +381,13 @@ for my $twikiFile (@twikiFiles) {
 
     # print output
     if ($no_file) {
-	print @output;
+	if ($useStdout) { print @output }
     } else {
 	unless ($dryRun && !$useStdout && !$keepPageFiles) {
 	    open(MEDIAWIKI,">$mediawikiFile") or die("unable to open $mediawikiFile - $!");
 	    print MEDIAWIKI @output;
 	    close(MEDIAWIKI) or die("unable to close $mediawikiFile - $!");
+	    if ($useStdout) { system "cat $mediawikiFile" }
 	}
     }
 
@@ -399,7 +401,6 @@ for my $twikiFile (@twikiFiles) {
     # Do Mediawiki import
     if ($importPages) {
 	my $mwUser = ($user or $author or "");
-	if ($useStdout) { system "cat $mediawikiFile" }
 	run_maintenance_script ("$importScript --bot --overwrite --user='$mwUser' --summary='$summary' $use_timestamp $mediawikiFile");
 	unlink($mediawikiFile) unless $keepPageFiles;
     }
@@ -535,7 +536,7 @@ sub addAttachment {
     if ($uploadAttachments) {
 	my %info = ('web' => $web, 'topic' => $topic);
 	while ($info =~ /([a-z]+)="(.*?)"/g) { $info{$1} = $2 }
-	unless ($info->{name} =~ /^(graph|latex)[a-f0-9]{32}.png$/) {  # skip attachments that look like they were made by MathModePlugin or DirectedGraphPlugin
+	unless ($info{'name'} =~ /^(graph|latex)[a-f0-9]{32}\.png$/) {  # skip attachments that look like they were made by MathModePlugin or DirectedGraphPlugin
 	    push @attachments, \%info;
 	}
     }
