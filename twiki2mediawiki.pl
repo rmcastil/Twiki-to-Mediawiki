@@ -42,6 +42,7 @@ my ($verbose,
     $renamePages,
     $keepPageFiles,
     $user,
+    $wwwUser,
     $uploadAttachments,
     $dryRun);
 
@@ -73,6 +74,7 @@ my $usage = "Usage: $0 [OPTIONS] <TWiki file(s)>\n"
     . " -summary <desc> Summary of edit (default '$summary')\n"
     . " -mw <dir>       Location of MediaWiki (default '$mwDir')\n"
     . " -upload         Run MediaWiki $uploadScript script\n"
+    . " -wwwuser <user> httpd user (e.g. apache, www-data)\n"
     . " -dryrun         Don't run MediaWiki scripts or save files\n"
     . " -verbose        Print more stuff\n"
     ;
@@ -90,6 +92,7 @@ GetOptions ("data=s" => \$dataDir,
 	    "summary=s" => \$summary,
 	    "mw=s" => \$mwDir,
 	    "upload" => \$uploadAttachments,
+	    "wwwuser=s" => \$wwwUser,
 	    "dryrun" => \$dryRun,
 	    "verbose" => \$verbose)
   or die("Error in command line arguments\n" . $usage);
@@ -556,7 +559,13 @@ sub attachmentLinkPrefix {
 
 sub run_maintenance_script {
     my ($script) = @_;
-    my $cmd = "$php $script";
+    unless (defined $wwwUser) {
+	$wwwUser = `ps -ef | egrep '(httpd|apache2|apache)' | grep -v \`whoami\` | grep -v root | head -n1 | awk '{print \$1}'`;
+	chomp $wwwUser;
+	warn "Guessing: -wwwuser $wwwUser" unless $wwwUser eq '0';
+    }
+    my $sudo = $wwwUser eq '0' ? "" : "sudo -u $wwwUser ";
+    my $cmd = "$sudo$php $script";
     warn "$cmd\n";
     unless ($dryRun) {
 	system "cd $mwDir/maintenance; $cmd";
