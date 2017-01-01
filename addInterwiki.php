@@ -28,20 +28,16 @@ require_once __DIR__ . '/Maintenance.php';
  *
  * @since 1.28
  */
-class AddInterwiki extends LoggedUpdateMaintenance {
+class AddInterwiki extends Maintenance {
 	public function __construct() {
 		parent::__construct();
 		$this->addDescription( 'Add an entry to the interwiki database table' );
 		$this->addOption( 'overwrite', 'Overwrite existing links' );
-		$this->addArg( 'prefix', 'Prefix', false );
-		$this->addArg( 'URL', 'URL', false );
+		$this->addArg( 'prefix', 'Interwiki prefix', false );
+		$this->addArg( 'URL', 'Interwiki URL', false );
 	}
 
-	protected function getUpdateKey() {
-		return __CLASS__;
-	}
-
-	protected function doDBUpdates() {
+	public function execute() {
 		$interwikiCache = $this->getConfig()->get( 'InterwikiCache' );
 		// Using something other than the database,
 		if ( $interwikiCache !== false ) {
@@ -55,21 +51,36 @@ class AddInterwiki extends LoggedUpdateMaintenance {
 
         if (!$this->hasArg(1)) { $this->error("Need to specify URL", 1); }
         $url = $this->getArg(1);
-	
+
         $dbw = $this->getDB( DB_MASTER );
-        $dbw->replace(
-            'interwiki',
-            [ 'iw_prefix' ],
-            [
-                'iw_prefix' => $prefix,
-                'iw_url' => $url,
-                'iw_api' => '',
-                'iw_wikiid' => '',
-                'iw_local' => 0,
-            ],
-            __METHOD__,
-            ($overwrite ? [] : [ 'IGNORE' ])
-        );
+		$oldUrl = $dbw->selectField(
+			'interwiki',
+			'iw_url',
+			[ 'iw_prefix' => 'rfc' ],
+			__METHOD__
+		);
+
+        $skip = false;
+        if ($oldUrl !== false) {
+            $this->output("InterWiki prefix " . $prefix . " exists with URL " . $url . "\n");
+            $skip = !$overwrite;
+        }
+
+        if (!$skip) { 
+            $this->output("Adding InterWiki link " . $prefix . ':$1 --> ' . $url . "\n");
+            $dbw->replace(
+                'interwiki',
+                [ 'iw_prefix' ],
+                [
+                    'iw_prefix' => $prefix,
+                    'iw_url' => $url,
+                    'iw_api' => '',
+                    'iw_wikiid' => '',
+                    'iw_local' => 0,
+                ],
+                __METHOD__
+            );
+        }
 
 		return true;
 	}
