@@ -212,22 +212,22 @@ my @rules= (
     # 
     # Links 
     # 
-    q%s/\[\[(https?\:.*?)\]\[(.*?)\]\]/makeLink($1,$2)/ge%, # external link [[http(s):...][label]] 
-    q%s/\[\[(ftp\:.*?)\]\[(.*?)\]\]/makeLink($1,$2)/ge%, # external link [[ftp:...][label]] 
-    q%s/\[\[([^\]<>]*)\]\]/makeLink(makeWikiWord($1),$1)/ge%, # [[link]] -> link
-    q%s/\[\[([^\]<>]*)\]\[(.*?)\]\]/makeLink($1,$2)/ge%, # [[link][text]] -> link
-    q%s/<a.*?href="(.*?)".*?>\s*(.*?)\s*<\/a>/makeLink($1,$2)/ge%, # external link
+    q%s/\[\[(https?\:.*?)\]\[(.*?)\]\]/makeLink($1,$2)/ge%, # [[http(s):...][label]] 
+    q%s/\[\[(ftp\:.*?)\]\[(.*?)\]\]/makeLink($1,$2)/ge%, # [[ftp:...][label]] 
+    q%s/\[\[([^\]<>]*)\]\]/makeLink(makeWikiWord($1),$1)/ge%, # [[link]]
+    q%s/\[\[([^\]<>]*)\]\[(.*?)\]\]/makeLink($1,$2)/ge%, # [[link][text]]
+    q%s/<a.*?href="(.*?)".*?>\s*(.*?)\s*<\/a>/makeLink($1,$2)/ge%, # <a href="...">...</a>
 
     # 
     # Wiki Tags 
     # 
-    q#s/<(\/?)verbatim>/<$1nowiki>/g#, # update verbatim tag. 
+    q#s/<(\/?)verbatim>/<$1pre>/g#, # update verbatim tag. 
     q#s/(?<=[\s\(])([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*))/makeLink("$1:$2")/ge#,  # InterWiki links
     q#s/(?<=[\s\(])([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*))/<nop>$1:$2/g#,  # avoid linking remaining InterWiki links
     q#s/$web\.([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1)/ge#, # $web.WikiWord -> link
     q#s/([A-Z][A-Za-z0-9]*)\.([A-Z][a-z]+[A-Z][A-Za-z]*)/<nop>$1.<nop>$2/g#, # OtherWebName.WikiWord -> <nop>OtherWebName.<nop>WikiWord
     q#s/<nop>([A-Z]{1}\w+?[A-Z]{1})/!$1/g#, # change <nop> to ! in front of Twiki words. 
-    q@s/(?<![\!:#])\b([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1,spaceWikiWord($1))/ge@, # WikiWord -> link
+    q@s/(?:^|(?<=[\s\(]))([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1,spaceWikiWord($1))/ge@, # WikiWord -> link
     q#s/!([A-Z]{1}\w+?[A-Z]{1})/$1/g#, # remove ! in front of Twiki words.
     q#s/<nop>//g#, # remove <nop>
 
@@ -563,7 +563,7 @@ sub _translateText {
 sub makeLink {
     my ($link, $text) = @_;
     my $isAnchor = ($link =~ /^#/);
-    my $isInternal = ($link =~ /^[A-Za-z0-9\.]+$/);
+    my $isInternal = ($link =~ /^[A-Za-z0-9\#\.]+$/);
     my $isInterwiki = ($link =~ /(?<=[\s\(])([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*))/);
     return ($isAnchor || $isInternal || $isInterwiki) ? makeInternalLink($link,$text) : makeExternalLink($link,$text);
 }
