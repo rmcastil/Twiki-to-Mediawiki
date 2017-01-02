@@ -1,6 +1,6 @@
 language: perl
 
 before_script:
-  - sudo cpanm --quiet --installdeps --notest DateTime
+  - cpanm --quiet --installdeps --notest DateTime
 
 script: make test
