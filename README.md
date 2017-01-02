@@ -10,6 +10,7 @@ Run `twiki2mediawiki.pl` to convert a TWiki web to MediaWiki.
 - Optionally import attachments using [importImages.php](https://www.mediawiki.org/wiki/Manual:ImportImages.php)
     - Optionally delete them first using [deleteBatch.php](https://www.mediawiki.org/wiki/Manual:DeleteBatch.php)
     - Attachments from other pages & webs are automatically included
+- Optionally import all your InterWiki links
 - Preserves timestamps (but not revision history) and usernames (but doesn't create users)
 - Converts most formatting including lists & tables
 - Converts some built-in TWiki variables including e.g. `%TOPIC%`, `%INCLUDE%`, `%ICON%`, `%ATTACHURL%`, `%DATE%`
@@ -27,6 +28,8 @@ Installation
 Requires:
 - Perl
 - [DateTime](http://search.cpan.org/~drolsky/DateTime-1.42/lib/DateTime.pm)
+
+Run the tests: `make test`
 
 License
 -------
