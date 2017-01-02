@@ -565,7 +565,6 @@ sub makeLink {
     my $isAnchor = ($link =~ /^#/);
     my $isInternal = ($link =~ /^(((Media:|File:)|[A-Za-z0-9\.\-_,]+)|((|[A-Z][A-Za-z0-9]*\.)([A-Za-z0-9]+)(|\#[A-Za-z0-9_]+)))$/);
     my $isInterwiki = ($link =~ /(?<=[\s\(])([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*))/);
-    warn $link if $isInternal;
     return ($isAnchor || $isInternal || $isInterwiki) ? makeInternalLink($link,$text) : makeExternalLink($link,$text);
 }
 
