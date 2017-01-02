@@ -28,7 +28,6 @@ use Getopt::Long;
 use File::Basename;
 use Cwd qw(abs_path);
 use File::Temp;
-use DateTime;
 use Encode;
 
 # Options that are disabled/empty by default
@@ -519,8 +518,8 @@ if ($uploadAttachments && @attachments) {
 		if ($attachName =~ /\.([^\.]+)$/) { $extensions = "--extensions=" . $1 }
 		my $comment = $info->{comment};
 		my $epoch = $info->{date} || time();
-		my $dt = DateTime->from_epoch( epoch => $epoch );
-		my $mwDate = $dt->ymd('') . $dt->hms('');
+		my ($sec, $min, $hour, $day, $month, $year) = (localtime($epoch))[0..5];
+		my $mwDate = sprintf ("%04d%02d%02d%02d%02d%02d", $year + 1900, $month + 1, $day, $hour, $min, $sec);
 		my $mwUser = ($user or (defined($info->{user}) ? spaceWikiWord($info->{user}) : undef));
 		my $userArg = defined($mwUser) ? "--user='$mwUser'" : "";
 		my $commentArg = defined($comment) ? "--comment='$comment'" : "";
@@ -855,4 +854,10 @@ sub findFirst {
     return undef;
 }
 
+sub epochToSMHDMY {
+    my ($time) = @_;
+    my ($sec, $min, $hour, $day, $month, $year) = (localtime($time))[0..5];
+# You can use 'gmtime' for GMT/UTC dates instead of 'localtime'
+print "Unix time ".$time." converts to ".$months[$month]." ".$day.", ".($year+1900);
+print " ".$hour.":".$min.":".$sec."\n";
 1;

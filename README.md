@@ -27,7 +27,6 @@ Installation
 
 Requires:
 - Perl
-- [DateTime](http://search.cpan.org/~drolsky/DateTime-1.42/lib/DateTime.pm)
 
 Run the tests: `make test`
 
