@@ -44,7 +44,11 @@ The original sources can be found here:
 Disclaimers
 -----------
 
-This source is NOT thoroughly tested, and will not be supported. Use at your own risk. I needed a simple solution and this is what I came up with.
+There are no guarantees made about this software, and it will not be supported for free.
+
+Use at your own risk, and be prepared for some rough edges.
+The conversion will almost certainly be flawed, and you may need to iterate a few times, fixing bugs as you go.
+I found it helpful to keep both TWiki and MediaWiki up in parallel during the migration, editing the TWiki pages to fix some glitches and editing this software to fix others.
 
 This code should not be seen as a statement of wiki-engine advocacy.
 TWiki has given me great service over the years, and the community is helpful.
