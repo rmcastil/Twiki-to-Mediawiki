@@ -218,9 +218,9 @@ my @rules= (
     q%s/^\s*#(\S+)\s*$/<div id="<nop>$1"><\/div>/g%,  # replace anchors with empty div's
 
     # Interwikis
-    q#s/\[\[$iwSitePattern:$iwPagePattern\]\]/makeLink("$1:$2")/ge#,
+#    q#s/\[\[$iwSitePattern:$iwPagePattern\]\]/makeLink("$1:$2")/ge#,
     q#s/\[\[$iwSitePattern:$iwPagePattern\]\[([^\]]+)\]\]/makeLink("$1:$2",$3)/ge#,
-    q#s/(?:^|(?<=[\s\-\*\(]))$iwSitePattern:$iwPagePattern(?=[\s\.\,\;\:\!\?\)\|]*(?:\s|$))/makeLink("$1:$2")/ge#,
+    q#s/(?:^|(?<=[\s\-\*\(]))$iwSitePattern:$iwPagePattern(?=[\s\.\,\;\:\!\?\)\|]*(?:\s|$))/makeInterwikiLink($1,$2)/ge#,
 
     # 
     # Links 
@@ -597,6 +597,14 @@ sub makeExternalLink {
     return ($link eq $text) ? "<nop>$link" : "[<nop>$link ".protectWikiWords($text)."]";
 }
 
+sub makeInterwikiLink {
+    my ($site, $page) = @_;
+    if ($site =~ /^(Media|File)$/) {
+	return "$site:$page";
+    }
+    return makeLink("$site:$page");
+}
+
 sub stripInterwikiQuotes {
     my ($text) = @_;
     $text =~ s/^$iwSitePattern:'(.*)'$/$1:$2/;
@@ -651,7 +659,7 @@ sub attachmentLink {
 
 sub attachmentLinkPrefix {
     my ($web, $topic) = @_;
-    return "<nop>Media:$topic.";
+    return "Media:$topic.";
 }
 
 sub runMaintenanceScript {

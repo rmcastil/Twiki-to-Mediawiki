@@ -6,7 +6,9 @@
 
 [[%ATTACHURL%/myfile.txt]]
 [[%ATTACHURL%/myfile.txt][link to myfile]]
+
 <img src="%ATTACHURL%/myfile.png"/>
+<a href="http://somewhere.com/"> <img src="%ATTACHURL%/myfile.png"/> </a>
 
 %PUBURL%/Main/MyTopic/generic_file_name.jpg
 %PUBURLPATH%/Main/MyTopic/another_file_name.jpg

@@ -5,8 +5,10 @@ Media:AttachUrl.WikiWord.txt
 Media:AttachUrl.WikiWord.png
 
 [[Media:AttachUrl.myfile.txt]]
-[[Media:AttachUrl.myfile.txt][link to myfile]]
+[[Media:AttachUrl.myfile.txt|link to myfile]]
+
 [[File:AttachUrl.myfile.png]]
+[[File:AttachUrl.myfile.png|link=http://somewhere.com/]]
 
 Media:MyTopic.generic_file_name.jpg
 Media:MyTopic.another_file_name.jpg

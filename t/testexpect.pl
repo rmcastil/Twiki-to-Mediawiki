@@ -8,9 +8,15 @@ use Cwd qw(abs_path);
 my $dir = dirname(abs_path($0));
 my $prog = abs_path("$dir/../twiki2mediawiki.pl");
 my $t2mw = basename($prog);
-opendir DIR, $dir;
-my @txt = grep (/\.txt$/, readdir DIR);
-closedir DIR;
+
+my @txt;
+if (@ARGV) {
+    @txt = @ARGV;
+} else {
+    opendir DIR, $dir;
+    @txt = grep (/\.txt$/, readdir DIR);
+    closedir DIR;
+}
 
 my $passed = 0;
 my @failed;
