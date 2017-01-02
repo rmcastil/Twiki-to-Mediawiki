@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/ihh/Twiki-to-Mediawiki.svg?branch=master)](https://travis-ci.org/ihh/Twiki-to-Mediawiki)
+
 Summary
 -------
 
