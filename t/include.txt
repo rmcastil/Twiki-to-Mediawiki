@@ -1,2 +1,4 @@
 %INCLUDE{"Main.MyTopic"}%
 %INCLUDE{"AnotherTopic"}%
+
+%INCLUDE{ "%SYSTEMWEB%.UserReports" section="user_sig" user="%DEFAULT%" disablefixlinks="on" }%

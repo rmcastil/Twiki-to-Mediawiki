@@ -18,5 +18,6 @@
 %JQTABPANE%
 %ACTIVATEDPLUGINS%
 %SCRIPTURL%
+%SYSTEMWEB%
 
 %META:PREFERENCE{name="MYVAR2" type="Set" value="how are you?"}%

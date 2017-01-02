@@ -145,7 +145,8 @@ my ($topic, $author, $date, @attachments, @linkedAttachments, %twikiVar, %warned
 my $man = 'A-Za-z0-9';  # mixed alphanumeric
 my $iwSitePattern = "([A-Z][$man]+)";
 my $iwPagePattern = "((?:'[^']*')|(?:\"[^\"]*\")|(?:[${man}\_\~\%\/][$man" . '\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*?))';
-my $varPattern = "([A-Za-z0-9_]+)";
+my $varPattern = "([${man}_]+)";
+my $wwPattern = "[A-Z][a-z]+[A-Z][$man]*";
 my @rules= ( 
 
     # Remove variable-setting lines (they will already have been parsed)
@@ -181,9 +182,9 @@ my @rules= (
     q#s/^%META.*//g#, # Remove remaining meta tags
 
     # %INCLUDE%
-    q#s/%INCLUDE\{"?$web\.(.*?)"?\}%/{{:<nop>$1}}/g#, # %INCLUDE{$web.XXX}% --> {{XXX}}
-    q#s/%INCLUDE\{"?(.*?)"?\}%/{{:<nop>$1}}/g#, # %INCLUDE{XXX}% --> {{XXX}}
-    q#s/%INCLUDE\{.*?\}%//g#, # remove remaining %INCLUDE{...}%'s
+    q#s/%INCLUDE{\s*(?:$web\.|)([$man]*?)\s*}%/{{:<nop>$1}}/g#,
+    q#s/%INCLUDE{\s*"(?:$web\.|)([$man]*?)".*?}%/{{:<nop>$1}}/g#,
+    q#s/%INCLUDE{.*?}%//g#, # remove remaining %INCLUDE{...}%'s
     q#s/%STARTINCLUDE%/<onlyinclude>/#,
     q#s/%STOPINCLUDE%/<\/onlyinclude>/#,
 
@@ -233,10 +234,10 @@ my @rules= (
     # 
     # WikiWords
     # 
-    q#s/$web\.([A-Z][A-Za-z0-9]*)/makeLink($1)/ge#, # $web.WikiWord -> link
-    q#s/([A-Z][A-Za-z0-9]*)\.([A-Z][A-Za-z0-9]*)/<nop>$1.<nop>$2/g#, # OtherWebName.WikiWord -> <nop>OtherWebName.<nop>WikiWord
+    q#s/$web\.([A-Z][${man}]*)/makeLink($1)/ge#, # $web.WikiWord -> link
+    q#s/([A-Z][${man}]*)\.($wwPattern)/<nop>$1.<nop>$2/g#, # OtherWebName.WikiWord -> <nop>OtherWebName.<nop>WikiWord
     q#s/<nop>([A-Z]{1}\w+?[A-Z]{1})/!$1/g#, # change <nop> to ! in front of Twiki words. 
-    q@s/(?:^|(?<=[\s\(]))([A-Z][a-z]+[A-Z][A-Za-z0-9]*)/makeLink($1,spaceWikiWord($1))/ge@, # WikiWord -> link
+    q@s/(?:^|(?<=[\s\(]))($wwPattern)/makeLink($1,spaceWikiWord($1))/ge@, # WikiWord -> link
     q#s/!([A-Z]{1}\w+?[A-Z]{1})/$1/g#, # remove ! in front of Twiki words.
     q#s/<nop>//g#, # remove <nop>
 
@@ -538,7 +539,7 @@ if ($addInterwikis) {
     my $interwikiFile = getInterwikiFile();
     open INTERWIKI, "<$interwikiFile";
     while (<INTERWIKI>) {
-	if (/^\|\s*([A-Z][A-Za-z0-9]+)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|.*$/) {
+	if (/^\|\s*([A-Z][${man}]+)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|.*$/) {
 	    my ($prefix, $url, $tooltip) = ($1, $2, $3);
 	    $prefix = lc($prefix);
 	    $url =~ s/\$page/\$1/g;
@@ -577,7 +578,7 @@ sub _translateText {
 sub makeLink {
     my ($link, $text) = @_;
     my $isAnchor = ($link =~ /^#/);
-    my $isInternal = ($link =~ /^(((Media|File):[A-Za-z0-9\.\-_,]+)|((|[A-Z][A-Za-z0-9]*\.)([A-Za-z0-9]+)(|\#[A-Za-z0-9_]+)))$/);
+    my $isInternal = ($link =~ /^(((Media|File):[${man}\.\-_,]+)|((|[A-Z][${man}]*\.)([${man}]+)(|\#[${man}_]+)))$/);
     my $isInterwiki = ($link =~ /^$iwSitePattern:$iwPagePattern$/);
     $link = stripInterwikiQuotes($link) if $isInterwiki;
     return ($isAnchor || $isInternal || $isInterwiki) ? makeInternalLink($link,$text) : makeExternalLink($link,$text);
@@ -586,7 +587,7 @@ sub makeLink {
 sub makeInternalLink {
     my ($link, $text) = @_;
     $link =~ s/^$web\.//;
-    if ($renamePages && $link =~ /^[A-Za-z0-9_]+$/) { $link = spaceWikiWord($link) }
+    if ($renamePages && $link =~ /^[${man}_]+$/) { $link = spaceWikiWord($link) }
     $text = $text || $link;
     return ($link eq $text) ? "[[<nop>$link]]" : "[[<nop>$link|".protectWikiWords($text)."]]";
 }
@@ -614,7 +615,7 @@ sub stripInterwikiQuotes {
 
 sub protectWikiWords {
     my ($text) = @_;
-    $text =~ s/([A-Z][a-z]+[A-Z][A-Za-z0-9]*)/<nop>$1/g;
+    $text =~ s/($wwPattern)/<nop>$1/g;
     return $text;
 }
 
