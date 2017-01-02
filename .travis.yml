@@ -1,4 +1,4 @@
 before_script:
-  - sudo cpan -T -i DateTime
+  - sudo cpanm --quiet --installdeps --notest DateTime
 
 script: make test
