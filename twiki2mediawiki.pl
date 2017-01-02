@@ -227,7 +227,7 @@ my @rules= (
     q%s/\[\[(https?\:.*?)\]\[(.*?)\]\]/makeLink($1,$2)/ge%, # [[http(s):...][label]] 
     q%s/\[\[(ftp\:.*?)\]\[(.*?)\]\]/makeLink($1,$2)/ge%, # [[ftp:...][label]] 
     q%s/\[\[([^\]<>]*)\]\]/makeLink(makeWikiWord($1),$1)/ge%, # [[link]]
-    q%s/\[\[([^\]<>]*)\]\[(.*?)\]\]/makeLink($1,$2)/ge%, # [[link][text]]
+    q%s/\[\[([^\]<>]*)\]\[(.*?)\]\]/makeLink(makeWikiWord($1),$2)/ge%, # [[link][text]]
     q%s/<a.*?href="(.*?)".*?>\s*(.*?)\s*<\/a>/makeLink($1,$2)/ge%, # <a href="...">...</a>
 
     # 

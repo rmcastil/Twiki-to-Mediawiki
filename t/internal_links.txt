@@ -2,3 +2,4 @@
 [[Media:file1.jpg][This is an internal link to attachment file1.jpg]]
 [[Media:file2.jpg][This is an internal link to attachment file2.jpg]]
 [[internal link to wiki word]]
+[[spaced internal link][link text]]
