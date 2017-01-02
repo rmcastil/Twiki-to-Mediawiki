@@ -563,7 +563,7 @@ sub _translateText {
 sub makeLink {
     my ($link, $text) = @_;
     my $isAnchor = ($link =~ /^#/);
-    my $isInternal = ($link =~ /^(((Media:|File:)|[A-Za-z0-9\.\-_,]+)|((|[A-Z][A-Za-z0-9]*\.)([A-Za-z0-9]+)(|\#[A-Za-z0-9_]+)))$/);
+    my $isInternal = ($link =~ /^(((Media|File):[A-Za-z0-9\.\-_,]+)|((|[A-Z][A-Za-z0-9]*\.)([A-Za-z0-9]+)(|\#[A-Za-z0-9_]+)))$/);
     my $isInterwiki = ($link =~ /(?<=[\s\(])([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*))/);
     return ($isAnchor || $isInternal || $isInterwiki) ? makeInternalLink($link,$text) : makeExternalLink($link,$text);
 }
