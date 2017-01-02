@@ -1,3 +1,5 @@
+language: perl
+
 before_script:
   - sudo cpanm --quiet --installdeps --notest DateTime
 
