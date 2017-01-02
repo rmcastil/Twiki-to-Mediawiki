@@ -1,5 +1,3 @@
-# PREREQ_PM => { "DateTime" => "1.06" }
-
 test:
 	t/testexpect.pl
 
