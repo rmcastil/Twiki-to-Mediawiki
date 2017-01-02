@@ -541,6 +541,7 @@ if ($addInterwikis) {
     while (<INTERWIKI>) {
 	if (/^\|\s*([A-Z][A-Za-z0-9]+)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|.*$/) {
 	    my ($prefix, $url, $tooltip) = ($1, $2, $3);
+	    $prefix = lc($prefix);
 	    $url =~ s/\$page/\$1/g;
 	    $url .= '$1' unless $url =~ /\$1/;
 	    runMaintenanceScript ("$interwikiScript --overwrite $prefix '$url'");
