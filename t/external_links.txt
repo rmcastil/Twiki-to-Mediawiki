@@ -1,0 +1,4 @@
+[[http://example.com/testing%20links][This is an external link]]
+[[https://example.com/TestingAgain][This is another external link]]
+[[ftp://ftp.20thcentury.com/][Check out this FTP archive]]
+<a alt="something" href="http://website.com/" rel="nofollow">This is an HTML link</a>

@@ -1,0 +1,22 @@
+%A_URL%
+%PARAM3%
+%POS:BEFORE%
+%SECTION2%
+
+%TMPL:DEF{"submit"}%<input id="submit" type="submit" class="twikiSubmit" value='%MAKETEXT{"Create this topic"}%' />%TMPL:END%
+%TMPL:DEF{"test"}%
+%TMPL:END%
+
+
+   * Set MYVAR = hello world
+   * Set MY_VAR_3 = goodbye world
+%MYVAR%
+%MYVAR2%
+%MY_VAR_3%
+
+%TOC%
+%JQTABPANE%
+%ACTIVATEDPLUGINS%
+%SCRIPTURL%
+
+%META:PREFERENCE{name="MYVAR2" type="Set" value="how are you?"}%

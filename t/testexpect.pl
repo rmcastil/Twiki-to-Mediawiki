@@ -12,8 +12,10 @@ opendir DIR, $dir;
 my @txt = grep (/\.txt$/, readdir DIR);
 closedir DIR;
 
+my $passed = 0;
+my @failed;
 for my $n (0..$#txt) {
-    my $desc = desc($n);
+    my $desc = desc($n+1);
     my $txt = $txt[$n];
     my $mw = $txt;
     $mw =~ s/txt$/mw/;
@@ -27,16 +29,23 @@ for my $n (0..$#txt) {
 
     if (length $diff) {
 	print "`$t2mw $txt` does not match $mw:\n";
-	print `diff -y $fname $mw`;
+	print `diff -y $fname $dir/$mw`;
 	print "not ok ($desc): $txt\n";
-	die;
+	push @failed, $txt;
     } else {
 	print "ok ($desc): $txt\n";
+	++$passed;
     }
 }
-print "ok: passed ", desc($#txt), " tests\n";
+
+if ($passed == @txt) {
+    print "ok: passed ", desc($passed), " tests\n";
+} else {
+    print "Failed tests: @failed\n";
+    die "not ok: passed ", desc($passed), " tests\n";
+}
 
 sub desc {
     my ($n) = @_;
-    return ($n + 1) . "/" . (@txt + 0);
+    return $n . "/" . (@txt + 0);
 }

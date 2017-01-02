@@ -1,5 +1,12 @@
-%ATTACHURL%/
-%ATTACHURLPATH%/
+%ATTACHURL%/myfile.txt
+%ATTACHURLPATH%/myfile.png
+
+%ATTACHURL%/WikiWord.txt
+%ATTACHURLPATH%/WikiWord.png
+
+[[%ATTACHURL%/myfile.txt]]
+[[%ATTACHURL%/myfile.txt][link to myfile]]
+<img src="%ATTACHURL%/myfile.png"/>
 
 %PUBURL%/Main/MyTopic/generic_file_name.jpg
 %PUBURLPATH%/Main/MyTopic/another_file_name.jpg

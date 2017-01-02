@@ -143,10 +143,14 @@ if ($dataDir) {
 # *Quoting with a percent ("%") or hash ("#") sign. 
 #
 my ($topic, $author, $date, @attachments, @linkedAttachments, %twikiVar, %warned, $currentText, %pageNonempty);  # global variables used by parser
+my $man = 'A-Za-z0-9';  # mixed alphanumeric
+my $iwSitePattern = "([A-Z][$man]+)";
+my $iwPagePattern = "((?:'[^']*')|(?:\"[^\"]*\")|(?:[${man}\_\~\%\/][$man" . '\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*?))';
+my $varPattern = "([A-Za-z0-9_]+)";
 my @rules= ( 
 
     # Remove variable-setting lines (they will already have been parsed)
-    q#/^\* +Set +([A-Za-z]+) += +(.*)//#,
+    q#s/^\s*\* Set $varPattern = (.*)//#,
 
     # %TOPIC% and %SPACEDTOPIC%
     q#s/%TOPIC%/$topic/g#,
@@ -194,7 +198,8 @@ my @rules= (
     q#s/%PARAM\d+%//g#,
     q#s/%POS:(.*?)%//g#,
     q#s/%SECTION\d+%//g#,
-    q#s/%TMPL:[A-Z]+{.*?}%//g#,
+    q#s/%TMPL:DEF{.*?}.*?%TMPL:END%//g#,
+    q#s/%TMPL:[A-Z]+(|{.*?})%//g#,
 
     # EfetchPlugin -> Extension:PubmedParser
     q@s/%PMID[LC]?\{\s*(\S+?)\s*\}%/{{\#pmid:$1}}/g@,
@@ -206,9 +211,17 @@ my @rules= (
     # DirectedGraphPlugin -> Extension:GraphViz
     q#s/<(\/?)dot>/<$1graphviz>/g#,
 
+    # <verbatim>
+    q#s/<(\/?)verbatim>/<$1pre>/g#,
+
     # Anchors
     q%s/^\s*#(\S+)\s*$/<div id="<nop>$1"><\/div>/g%,  # replace anchors with empty div's
-    
+
+    # Interwikis
+    q#s/\[\[$iwSitePattern:$iwPagePattern\]\]/makeLink("$1:$2")/ge#,
+    q#s/\[\[$iwSitePattern:$iwPagePattern\]\[([^\]]+)\]\]/makeLink("$1:$2",$3)/ge#,
+    q#s/(?:^|(?<=[\s\-\*\(]))$iwSitePattern:$iwPagePattern(?=[\s\.\,\;\:\!\?\)\|]*(?:\s|$))/makeLink("$1:$2")/ge#,
+
     # 
     # Links 
     # 
@@ -219,15 +232,12 @@ my @rules= (
     q%s/<a.*?href="(.*?)".*?>\s*(.*?)\s*<\/a>/makeLink($1,$2)/ge%, # <a href="...">...</a>
 
     # 
-    # Wiki Tags 
+    # WikiWords
     # 
-    q#s/<(\/?)verbatim>/<$1pre>/g#, # update verbatim tag. 
-    q#s/(?<=[\s\(])([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*))/makeLink("$1:$2")/ge#,  # InterWiki links
-    q#s/(?<=[\s\(])([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*))/<nop>$1:$2/g#,  # avoid linking remaining InterWiki links
-    q#s/$web\.([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1)/ge#, # $web.WikiWord -> link
-    q#s/([A-Z][A-Za-z0-9]*)\.([A-Z][a-z]+[A-Z][A-Za-z]*)/<nop>$1.<nop>$2/g#, # OtherWebName.WikiWord -> <nop>OtherWebName.<nop>WikiWord
+    q#s/$web\.([A-Z][A-Za-z0-9]*)/makeLink($1)/ge#, # $web.WikiWord -> link
+    q#s/([A-Z][A-Za-z0-9]*)\.([A-Z][A-Za-z0-9]*)/<nop>$1.<nop>$2/g#, # OtherWebName.WikiWord -> <nop>OtherWebName.<nop>WikiWord
     q#s/<nop>([A-Z]{1}\w+?[A-Z]{1})/!$1/g#, # change <nop> to ! in front of Twiki words. 
-    q@s/(?:^|(?<=[\s\(]))([A-Z][a-z]+[A-Z][A-Za-z]*)/makeLink($1,spaceWikiWord($1))/ge@, # WikiWord -> link
+    q@s/(?:^|(?<=[\s\(]))([A-Z][a-z]+[A-Z][A-Za-z0-9]*)/makeLink($1,spaceWikiWord($1))/ge@, # WikiWord -> link
     q#s/!([A-Z]{1}\w+?[A-Z]{1})/$1/g#, # remove ! in front of Twiki words.
     q#s/<nop>//g#, # remove <nop>
 
@@ -249,7 +259,6 @@ my @rules= (
     q%s/(^|[\n\r])---\+\+\+\+([^\n\r]*)/$1====$2 ====/%, # H4 
     q%s/(^|[\n\r])---\+\+\+([^\n\r]*)/$1===$2 ===/%, # H3 
     q%s/(^|[\n\r])---\+\+([^\n\r]*)/$1==$2 ==/%, # H2 
-    q%s/(^|[\n\r])----\+\+([^\n\r]*)/$1==$2 ==/%, # H2 (slightly misformed variant) 
     q%s/(^|[\n\r])---\+([^\n\r]*)/$1=$2 =/%, # H1 
 
     # 
@@ -288,8 +297,8 @@ my @rules= (
     q%s/(^|[\n\r])[ ]{3}\$ ([^\:]*)/$1\; $2 /g%, # $ definition: term 
 
     # Lookup variable
-    q#s/%([A-Z]+)%/getTwikiVar($1,'')/ge#,
-    q#s/%([A-Z]+)(\{.*?\})%/getTwikiVar($1,$2)/ge#
+    q#s/%$varPattern%/getTwikiVar($1,'')/ge#,
+    q#s/%$varPattern(\{.*?\})%/getTwikiVar($1,$2)/ge#
     
     );
 
@@ -299,9 +308,6 @@ my %ignoreVar = map (($_ => 1), @ignoredVars);
 
 my @ignoredPages = qw(AllAuthUsersGroup AllUsersGroup ChangeProfilePicture NobodyGroup PatternSkinUserViewTemplate TWikiAdminGroup TWikiAdminUser TWikiAdminUserWatchlist TWikiContributor TWikiGroups TWikiGroupTemplate TWikiGuest TWikiPreferences TWikiRegistration TWikiRegistrationAgent TWikiUsers TWikiVariables UnknownUser UserListByDateJoined UserListByLocation UserListHeader UserList UserProfileHeader UserViewTemplate WebAtom WebChanges WebCreateNewTopic WebHome WebIndex WebLeftBar WebNotify WebPreferences WebRss WebSearchAdvanced WebSearchAttachments WebSearch WebStatistics WebTopicList WebTopMenu);
 my %ignorePage = map (($_ => 1), @ignoredPages);
-
-# TODO: implement...
-# ICON ICONURL ICONURLPATH
 
 grep (parseTwikiVars($_), @varFiles);
 my %twikiVarBase = %twikiVar;
@@ -410,20 +416,28 @@ for my $twikiFile (@twikiFiles) {
     if ($gotStartInclude && !$gotStopInclude) { push @output, "</onlyinclude>\n" }
     elsif (!$gotStartInclude && $gotStopInclude) { unshift @output, "<onlyinclude>\n" }
 
+    # Remove unnecessary whitespace and empty tags
+    my $output = join("",@output);
+    $output =~ s/<([a-z]+)>[\s\n]*<\/\1>//g;
+    $output =~ s/\n\s+($|(?=\n))/\n/g;
+    $output =~ s/\n{2,}/\n\n/g;
+    $output =~ s/^\n+//;
+    $output =~ s/\n+$/\n/;
+
+    $pageNonempty{$stub} = ($output =~ /\S/);
+
     # print output
     if ($noFile) {
-	if ($useStdout) { binmode STDOUT, ":utf8"; print @output }
+	if ($useStdout) { binmode STDOUT, ":utf8"; print $output }
     } else {
 	unless ($dryRun && !$useStdout && !$keepPageFiles) {
 	    open(MEDIAWIKI,">$mediawikiFile") or die("unable to open $mediawikiFile - $!");
 	    binmode MEDIAWIKI, ":utf8";	
-	    print MEDIAWIKI @output;
+	    print MEDIAWIKI $output;
 	    close(MEDIAWIKI) or die("unable to close $mediawikiFile - $!");
 	    if ($useStdout) { system "cat $mediawikiFile" }
 	}
     }
-
-    $pageNonempty{$stub} = grep /\S/, @output;
     
     # Change file timestamp
     my $useTimestamp = "";
@@ -564,7 +578,8 @@ sub makeLink {
     my ($link, $text) = @_;
     my $isAnchor = ($link =~ /^#/);
     my $isInternal = ($link =~ /^(((Media|File):[A-Za-z0-9\.\-_,]+)|((|[A-Z][A-Za-z0-9]*\.)([A-Za-z0-9]+)(|\#[A-Za-z0-9_]+)))$/);
-    my $isInterwiki = ($link =~ /(?<=[\s\(])([A-Z][A-Za-z0-9]+):((?:'[^']*')|(?:\"[^\"]*\")|(?:[A-Za-z0-9\_\~\%\/][A-Za-z0-9\.\/\+\_\~\,\&\;\:\=\!\?\%\#\@\-]*))/);
+    my $isInterwiki = ($link =~ /^$iwSitePattern:$iwPagePattern$/);
+    $link = stripInterwikiQuotes($link) if $isInterwiki;
     return ($isAnchor || $isInternal || $isInterwiki) ? makeInternalLink($link,$text) : makeExternalLink($link,$text);
 }
 
@@ -573,13 +588,26 @@ sub makeInternalLink {
     $link =~ s/^$web\.//;
     if ($renamePages && $link =~ /^[A-Za-z0-9_]+$/) { $link = spaceWikiWord($link) }
     $text = $text || $link;
-    return ($link eq $text) ? "[[<nop>$link]]" : "[[<nop>$link|<nop>$text]]";
+    return ($link eq $text) ? "[[<nop>$link]]" : "[[<nop>$link|".protectWikiWords($text)."]]";
 }
 
 sub makeExternalLink {
     my ($link, $text) = @_;
     $text = $text || $link;
-    return ($link eq $text) ? "<nop>$link" : "[<nop>$link <nop>$text]";
+    return ($link eq $text) ? "<nop>$link" : "[<nop>$link ".protectWikiWords($text)."]";
+}
+
+sub stripInterwikiQuotes {
+    my ($text) = @_;
+    $text =~ s/^$iwSitePattern:'(.*)'$/$1:$2/;
+    $text =~ s/^$iwSitePattern:"(.*)"$/$1:$2/;
+    return $text;
+}
+
+sub protectWikiWords {
+    my ($text) = @_;
+    $text =~ s/([A-Z][a-z]+[A-Z][A-Za-z0-9]*)/<nop>$1/g;
+    return $text;
 }
 
 sub makeWikiWord {
@@ -623,7 +651,7 @@ sub attachmentLink {
 
 sub attachmentLinkPrefix {
     my ($web, $topic) = @_;
-    return "Media:$topic.";
+    return "<nop>Media:$topic.";
 }
 
 sub runMaintenanceScript {
@@ -692,7 +720,7 @@ sub parseTwikiVars {
 
     open(TWIKI,"<$twikiVarFile") or die("unable to open $twikiVarFile - $!");
     while (<TWIKI>) {
-	if (/\* +Set +([A-Za-z]+) += +(.*)/) {
+	if (/\* +Set +$varPattern += +(.*)/) {
 	    setTwikiVar($1,$2);
 	} elsif (/^%META:PREFERENCE{name="(.+?)".*type="Set".*value="(.*?)"/) {
 	    setTwikiVar($1,$2);

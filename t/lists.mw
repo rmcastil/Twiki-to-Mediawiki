@@ -1,7 +1,8 @@
-
-
 * this is a list
 * second item in list
 ** nested item
-**** nested nested item
+**** doubly nested item
 ** second nested item
+* third item in list (single tab instead of three spaces)
+** nested below third item in list (two tabs)
+*** doubly nested (three tabs)

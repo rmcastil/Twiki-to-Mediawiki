@@ -1,0 +1,12 @@
+*bold*
+__italic bold__
+_italic_
+==monospaced bold==
+=monospaced=
+
+<verbatim>
+Check
+  this
+    out
+</verbatim>
+

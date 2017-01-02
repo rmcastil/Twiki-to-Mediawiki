@@ -1,0 +1,4 @@
+[[Wikipedia:Mathematics][This is an external link using Interwiki syntax]]
+[[Wikipedia:'Pipeline_(video_game)'][This is a trickier Interwiki link]]
+Wikipedia:Bioinformatics is an interwiki link in text context
+http://Wikipedia:Bioinformatics is not an interwiki link

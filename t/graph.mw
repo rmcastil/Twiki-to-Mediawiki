@@ -1,0 +1,5 @@
+<graphviz>
+digraph G {
+ a -> b -> c;
+}
+</graphviz>
