@@ -854,10 +854,4 @@ sub findFirst {
     return undef;
 }
 
-sub epochToSMHDMY {
-    my ($time) = @_;
-    my ($sec, $min, $hour, $day, $month, $year) = (localtime($time))[0..5];
-# You can use 'gmtime' for GMT/UTC dates instead of 'localtime'
-print "Unix time ".$time." converts to ".$months[$month]." ".$day.", ".($year+1900);
-print " ".$hour.":".$min.":".$sec."\n";
 1;
