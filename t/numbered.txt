@@ -1,0 +1,8 @@
+
+   1 numbered list
+   2 also numbered
+   1 still numbers
+      1 indent numbers
+         1 indent them again
+   1 back to beginning
+   

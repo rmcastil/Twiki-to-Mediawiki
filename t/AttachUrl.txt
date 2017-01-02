@@ -1,0 +1,5 @@
+%ATTACHURL%/
+%ATTACHURLPATH%/
+
+%PUBURL%/Main/MyTopic/generic_file_name.jpg
+%PUBURLPATH%/Main/MyTopic/another_file_name.jpg
