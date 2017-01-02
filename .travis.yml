@@ -1,6 +1,1 @@
 language: perl
-
-before_script:
-  - cpanm --quiet --installdeps --notest DateTime
-
-script: make test
