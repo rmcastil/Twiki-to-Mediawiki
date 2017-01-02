@@ -535,7 +535,7 @@ if ($uploadAttachments && @attachments) {
 if ($addInterwikis) {
     my $maintDir = "$mwDir/maintenance";
     my $repoDir = dirname(abs_path($0));
-    sysOrSudo("cp $repoDir/mediawiki/$interwikiScript $maintDir") unless -e "$maintDir/$interwikiScript";
+    sysOrSudo("cp $repoDir/$interwikiScript $maintDir") unless -e "$maintDir/$interwikiScript";
     my $interwikiFile = getInterwikiFile();
     open INTERWIKI, "<$interwikiFile";
     while (<INTERWIKI>) {
