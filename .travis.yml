@@ -1,4 +1,1 @@
-before_script:
-  - PERL_MM_USE_DEFAULT=1 perl -MCPAN -e 'install DateTime'
-
 script: make test
