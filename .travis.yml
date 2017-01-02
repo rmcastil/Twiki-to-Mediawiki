@@ -1,0 +1,4 @@
+before_script:
+  - sudo cpan -T -i DateTime
+
+script: make test
