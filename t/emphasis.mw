@@ -1,0 +1,11 @@
+'''bold'''
+''<b>italic bold</b>''
+''italic''
+'''<tt>monospaced bold</tt>'''
+<tt>monospaced</tt>
+
+<pre>
+Check
+  this
+    out
+</pre>

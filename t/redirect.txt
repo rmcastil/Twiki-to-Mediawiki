@@ -1,0 +1,3 @@
+%REDIRECT{"Main.AnotherPage"}%
+%REDIRECT{"DifferentPage"}%
+%REDIRECT{Bad redirect syntax}%

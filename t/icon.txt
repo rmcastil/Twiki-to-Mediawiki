@@ -1,0 +1,3 @@
+%ICON{"ppt"}%
+%ICONURL{"pdf"}%
+%ICONURLPATH{"zip"}%

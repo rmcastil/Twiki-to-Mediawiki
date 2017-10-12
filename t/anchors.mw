@@ -1,0 +1,5 @@
+<div id="MyAnchor"></div>
+[[#MyAnchor|link to my anchor]]
+[[SomePage#MyAnchor|link to anchor on SomePage]]
+[[SomeWeb.SomePage#MyAnchor|link to anchor on SomePage in SomeWeb]]
+[http://randomsite.com/#MyAnchor link to anchor on randomsite.com]

@@ -1,0 +1,3 @@
+%META:TOPICINFO{author="Ian Holmes" date="1483325160" format="1.0" version="1.1"}%
+%META:FILEATTACHMENT{name="Self.jpg" attr="" comment="Self" date="1221105865" path="Self.JPG" size="101006" user="FormerStudent" version="1.1"}%
+%META:UNRECOGNIZED{...}%
